@@ -19,16 +19,16 @@ Model all fundamental game concepts with no engine logic.
 ### Features
 
 #### 1. Piece System
-- [ ] Color enum (Red, Blue, Green, Yellow)
-- [ ] Size enum (Small, Medium, Large)
-- [ ] Piece struct
-- [ ] Ownership (PlayerId)
+- [x] Color enum (Red, Yellow, Green, Blue)
+- [x] Size enum (Small, Medium, Large)
+- [x] Piece struct
+- [x] Ownership (Player)
 
 #### 2. Player
-- [ ] PlayerId type
-- [ ] Validation (2 players only initially)
+- [x] Player type
+- [x] Validation (2 players only initially)
 
-#### 3. Stash (Bank)
+#### 3. Bank
 - [ ] Collection of all pieces
 - [ ] Draw/remove operations
 - [ ] Validation (no negative counts)
@@ -42,7 +42,7 @@ Model all fundamental game concepts with no engine logic.
 #### 5. GameState (domain only)
 - [ ] Systems collection
 - [ ] Player homeworlds
-- [ ] Stash state
+- [ ] Bank state
 
 ---
 
