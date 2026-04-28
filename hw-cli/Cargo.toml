@@ -1,0 +1,8 @@
+[package]
+name = "hw-cli"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+hw-core = { path = "../hw-core" }
+hw-engine = { path = "../hw-engine" }
