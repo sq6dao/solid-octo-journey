@@ -29,9 +29,9 @@ Model all fundamental game concepts with no engine logic.
 - [x] Validation (2 players only initially)
 
 #### 3. Bank
-- [ ] Collection of all pieces
-- [ ] Draw/remove operations
-- [ ] Validation (no negative counts)
+- [x] Collection of all pieces
+- [x] Draw/remove operations
+- [x] Validation (no negative counts)
 
 #### 4. Star System
 - [ ] Star = 1–2 pieces
