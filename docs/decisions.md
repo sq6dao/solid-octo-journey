@@ -547,6 +547,28 @@ bank exchange and system replacement.
 
 ---
 
+## 2026-05-12 – Invade Execution
+
+**Decision**
+Implement Invade transitions by replacing one matching opponent ship with
+the same color and size ship owned by the acting player.
+
+**Context**
+Invade validation already checks red power, opponent ownership, target
+presence, and same-or-larger acting-player ship size. The transition only
+needs to change target ownership in the selected system.
+
+**Alternatives**
+- Remove and rebuild the whole system through a dedicated ownership API
+- Delay ownership changes until turn sequencing exists
+
+**Consequences**
++ Red actions now mutate board ownership through `apply_action`
++ Bank state remains unchanged by Invade
+- Duplicate pieces are still represented by equal `Piece` values
+
+---
+
 ## Future Decisions (To Be Made)
 
 - Homeworld loss and win-condition validation

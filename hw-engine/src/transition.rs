@@ -1,4 +1,5 @@
 mod build;
+mod invade;
 // `move` is a Rust keyword; use a raw identifier so the file can still
 // match the action name.
 mod r#move;
@@ -38,6 +39,11 @@ pub fn apply_action(state: &GameState, action: &Action) -> Result<GameState, Tra
             from,
             to,
         } => trade::apply(state, *player, *system, *from, *to),
+        Action::Invade {
+            player,
+            system,
+            target,
+        } => invade::apply(state, *player, *system, *target),
         _ => Err(TransitionError::UnsupportedAction(action.kind())),
     }
 }

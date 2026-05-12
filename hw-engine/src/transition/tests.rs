@@ -222,6 +222,52 @@ fn apply_trade_action_returns_validation_errors() {
     );
 }
 
+#[test]
+fn apply_invade_action_changes_the_target_owner() {
+    let state = valid_state();
+    let target = owned_ship(Player::One, Color::Blue, Size::Small);
+    let captured = owned_ship(Player::Two, Color::Blue, Size::Small);
+    let action = Action::Invade {
+        player: Player::Two,
+        system: SystemId::new(0),
+        target,
+    };
+
+    let next = apply_action(&state, &action).expect("action applies");
+    let system = next.system(SystemId::new(0)).expect("system exists");
+
+    assert_eq!(count_ship(system, target), 0);
+    assert_eq!(count_ship(system, captured), 1);
+    assert_eq!(
+        next.bank().count(Color::Blue, Size::Small),
+        state.bank().count(Color::Blue, Size::Small)
+    );
+}
+
+#[test]
+fn apply_invade_action_returns_validation_errors() {
+    let target = owned_ship(Player::Two, Color::Blue, Size::Medium);
+    let state = state_with_primary_ships(vec![
+        owned_ship(Player::One, Color::Red, Size::Small),
+        target,
+    ]);
+    let action = Action::Invade {
+        player: Player::One,
+        system: SystemId::new(0),
+        target,
+    };
+
+    assert_eq!(
+        apply_action(&state, &action),
+        Err(TransitionError::InvalidAction(
+            ActionError::CannotInvadeLargerShip {
+                player: Player::One,
+                target,
+            }
+        ))
+    );
+}
+
 fn valid_state() -> GameState {
     state_with_bank(Bank::new())
 }
@@ -236,19 +282,27 @@ fn state_with_empty_bank_piece(color: Color, size: Size) -> GameState {
 }
 
 fn state_with_bank(bank: Bank) -> GameState {
+    state_with_primary_ships_and_bank(
+        bank,
+        vec![
+            owned_ship(Player::One, Color::Blue, Size::Small),
+            owned_ship(Player::One, Color::Green, Size::Small),
+            owned_ship(Player::One, Color::Yellow, Size::Small),
+            owned_ship(Player::Two, Color::Red, Size::Medium),
+        ],
+    )
+}
+
+fn state_with_primary_ships(ships: Vec<Piece>) -> GameState {
+    state_with_primary_ships_and_bank(Bank::new(), ships)
+}
+
+fn state_with_primary_ships_and_bank(bank: Bank, ships: Vec<Piece>) -> GameState {
     state_with_systems_and_homeworlds(
         bank,
         vec![
-            StarSystem::new(
-                vec![Piece::new(Color::Yellow, Size::Small)],
-                vec![
-                    owned_ship(Player::One, Color::Blue, Size::Small),
-                    owned_ship(Player::One, Color::Green, Size::Small),
-                    owned_ship(Player::One, Color::Yellow, Size::Small),
-                    owned_ship(Player::Two, Color::Red, Size::Medium),
-                ],
-            )
-            .expect("system is valid"),
+            StarSystem::new(vec![Piece::new(Color::Yellow, Size::Small)], ships)
+                .expect("system is valid"),
             StarSystem::new(
                 vec![Piece::new(Color::Green, Size::Medium)],
                 vec![owned_ship(Player::Two, Color::Yellow, Size::Small)],
