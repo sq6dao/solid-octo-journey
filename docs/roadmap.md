@@ -33,8 +33,8 @@
   Move rejects target systems that share a star size with the source.
   Invade requires a same-size-or-larger acting-player ship in the target
   system.
-- `hw-engine` exposes pure `apply_action` state transitions. Build and
-  Move are implemented; other actions currently validate and report
+- `hw-engine` exposes pure `apply_action` state transitions. Build, Move,
+  and Trade are implemented; other actions currently validate and report
   unsupported transition execution.
 - `hw-cli` is still a placeholder.
 - The workspace test suite currently covers core piece, bank, and star
@@ -113,7 +113,7 @@ Encode all legal moves and transitions.
 - [ ] No side effects
 - [x] Build
 - [x] Move
-- [ ] Trade
+- [x] Trade
 - [ ] Invade
 - [ ] Sacrifice
 - [ ] Catastrophe

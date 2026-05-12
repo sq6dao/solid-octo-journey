@@ -524,6 +524,29 @@ state even when their last ship leaves.
 
 ---
 
+## 2026-05-12 – Trade Execution
+
+**Decision**
+Implement Trade transitions by drawing the requested same-size bank piece,
+returning the old ship to the bank unowned, and replacing the ship in the
+target system.
+
+**Context**
+Trade validation already enforces ownership, presence, blue power, bank
+availability, and size matching. The transition can therefore focus on the
+bank exchange and system replacement.
+
+**Alternatives**
+- Return the old ship before drawing the new one
+- Leave bank updates for a later consistency pass
+
+**Consequences**
++ Trade now updates both board and bank state
++ Size preservation is enforced before execution
+- Piece counts reflect the current loose `GameState` bank consistency
+
+---
+
 ## Future Decisions (To Be Made)
 
 - Homeworld loss and win-condition validation

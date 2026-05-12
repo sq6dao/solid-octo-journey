@@ -3,6 +3,7 @@ mod build;
 // match the action name.
 mod r#move;
 mod shared;
+mod trade;
 
 use hw_core::{GameState, GameStateError, StarSystemError};
 
@@ -31,6 +32,12 @@ pub fn apply_action(state: &GameState, action: &Action) -> Result<GameState, Tra
             ship,
             target,
         } => r#move::apply(state, *player, *from, *ship, target),
+        Action::Trade {
+            player,
+            system,
+            from,
+            to,
+        } => trade::apply(state, *player, *system, *from, *to),
         _ => Err(TransitionError::UnsupportedAction(action.kind())),
     }
 }

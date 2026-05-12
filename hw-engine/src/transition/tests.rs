@@ -174,6 +174,54 @@ fn apply_move_action_keeps_an_empty_homeworld_source() {
     assert_eq!(next.homeworld(Player::One), SystemId::new(0));
 }
 
+#[test]
+fn apply_trade_action_replaces_a_ship_and_updates_the_bank() {
+    let state = valid_state();
+    let from = owned_ship(Player::One, Color::Blue, Size::Small);
+    let to = owned_ship(Player::One, Color::Red, Size::Small);
+    let action = Action::Trade {
+        player: Player::One,
+        system: SystemId::new(0),
+        from,
+        to,
+    };
+
+    let next = apply_action(&state, &action).expect("action applies");
+    let system = next.system(SystemId::new(0)).expect("system exists");
+
+    assert_eq!(count_ship(system, from), 0);
+    assert_eq!(count_ship(system, to), 1);
+    assert_eq!(
+        next.bank().count(Color::Red, Size::Small),
+        Bank::copies_per_piece() - 1
+    );
+    assert_eq!(
+        next.bank().count(Color::Blue, Size::Small),
+        Bank::copies_per_piece() + 1
+    );
+}
+
+#[test]
+fn apply_trade_action_returns_validation_errors() {
+    let state = valid_state();
+    let from = owned_ship(Player::One, Color::Blue, Size::Small);
+    let to = owned_ship(Player::One, Color::Red, Size::Medium);
+    let action = Action::Trade {
+        player: Player::One,
+        system: SystemId::new(0),
+        from,
+        to,
+    };
+
+    assert_eq!(
+        apply_action(&state, &action),
+        Err(TransitionError::InvalidAction(ActionError::SizeMismatch {
+            from,
+            to,
+        }))
+    );
+}
+
 fn valid_state() -> GameState {
     state_with_bank(Bank::new())
 }
