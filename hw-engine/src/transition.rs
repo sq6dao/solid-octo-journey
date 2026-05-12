@@ -1,4 +1,5 @@
 mod build;
+mod catastrophe;
 mod invade;
 // `move` is a Rust keyword; use a raw identifier so the file can still
 // match the action name.
@@ -9,14 +10,13 @@ mod trade;
 
 use hw_core::{GameState, GameStateError, StarSystemError};
 
-use crate::action::{Action, ActionError, ActionKind, validate_action};
+use crate::action::{Action, ActionError, validate_action};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TransitionError {
     InvalidAction(ActionError),
     InvalidState(GameStateError),
     InvalidSystem(StarSystemError),
-    UnsupportedAction(ActionKind),
 }
 
 pub fn apply_action(state: &GameState, action: &Action) -> Result<GameState, TransitionError> {
@@ -50,7 +50,7 @@ pub fn apply_action(state: &GameState, action: &Action) -> Result<GameState, Tra
             system,
             ship,
         } => sacrifice::apply(state, *player, *system, *ship),
-        _ => Err(TransitionError::UnsupportedAction(action.kind())),
+        Action::Catastrophe { system, color } => catastrophe::apply(state, *system, *color),
     }
 }
 

@@ -479,9 +479,8 @@ the ship-size rule determines which opponent ships can be captured there.
 
 **Decision**
 Expose `apply_action(&GameState, &Action) -> Result<GameState,
-TransitionError>` from `hw-engine`. Implement Build execution first and
-return `UnsupportedAction` for other valid actions until their transition
-commits land.
+TransitionError>` from `hw-engine`. Implement action transitions in
+separate commits after adding the public API.
 
 **Context**
 The engine already validates actions without mutating state. State
@@ -495,8 +494,8 @@ returns a new `GameState`.
 
 **Consequences**
 + Callers get a deterministic transition API
-+ Each action transition can land as a separate tested commit
-- Unsupported transition errors are temporary while the action commits land
++ Each action transition landed as a separate tested commit
+- Turn sequencing remains outside this API
 
 ---
 
@@ -591,10 +590,37 @@ from sacrifice size remain a later turn-system concern.
 
 ---
 
+## 2026-05-12 – Catastrophe Execution
+
+**Decision**
+Implement Catastrophe transitions for one selected system. Remove all
+stars and ships of the selected color in that system, return them to the
+bank unowned, and leave other systems unchanged.
+
+If the selected non-homeworld system has no stars after the catastrophe,
+prune it even when ships remain, returning those remaining ships to the
+bank as well.
+
+**Context**
+Catastrophe validation already checks overpopulation in one system. The
+transition must not cascade into other systems or auto-resolve unrelated
+overpopulation.
+
+**Alternatives**
+- Remove matching pieces from every overpopulated system
+- Keep starless non-homeworld systems with remaining ships
+- Auto-run catastrophes after other action transitions
+
+**Consequences**
++ Catastrophe execution is explicit and single-system scoped
++ Starless non-homeworld cleanup matches the board model
+- Automatic catastrophe resolution remains out of scope
+
+---
+
 ## Future Decisions (To Be Made)
 
 - Homeworld loss and win-condition validation
-- Mutation APIs needed for pure state transitions
 - AI architecture
 - Serialization format (JSON vs binary)
 - Networking approach

@@ -33,9 +33,8 @@
   Move rejects target systems that share a star size with the source.
   Invade requires a same-size-or-larger acting-player ship in the target
   system.
-- `hw-engine` exposes pure `apply_action` state transitions. Build, Move,
-  Trade, Invade, and Sacrifice are implemented; Catastrophe currently
-  validates and reports unsupported transition execution.
+- `hw-engine` exposes pure `apply_action` state transitions for Build,
+  Move, Trade, Invade, Sacrifice, and Catastrophe.
 - `hw-cli` is still a placeholder.
 - The workspace test suite currently covers core piece, bank, and star
   system invariants, `GameState` container behavior, and initial action
@@ -109,14 +108,14 @@ Encode all legal moves and transitions.
 - [ ] Multi-action turns (via sacrifice)
 
 #### 4. State Transitions
-- [ ] Pure functions: `GameState -> Action -> GameState`
-- [ ] No side effects
+- [x] Pure functions: `GameState -> Action -> GameState`
+- [x] No side effects
 - [x] Build
 - [x] Move
 - [x] Trade
 - [x] Invade
 - [x] Sacrifice
-- [ ] Catastrophe
+- [x] Catastrophe
 
 ---
 
@@ -151,6 +150,7 @@ Minimal playable interface
 - [x] Bank invariants
 - [x] GameState container and homeworld behavior
 - [x] Action validation
+- [x] Action state transitions
 
 ### Integration Tests
 - [ ] Full turn sequences
