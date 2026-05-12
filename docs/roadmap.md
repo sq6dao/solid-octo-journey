@@ -26,9 +26,14 @@
   `has_presence` and `owners_present`.
 - `GameState` requires exactly one distinct homeworld per player, but
   homeworld loss checks are deferred.
-- `hw-engine` and `hw-cli` are still placeholders.
+- `hw-engine` currently defines typed actions and non-mutating validation
+  for Build, Move, and Trade. Move targets can be existing systems or
+  newly discovered systems. Sacrifice and catastrophe are represented but
+  return unsupported errors.
+- `hw-cli` is still a placeholder.
 - The workspace test suite currently covers core piece, bank, and star
-  system invariants, plus the current `GameState` container behavior.
+  system invariants, `GameState` container behavior, and initial action
+  validation.
 
 ---
 
@@ -78,17 +83,18 @@ Encode all legal moves and transitions.
 ### Features
 
 #### 1. Actions
-- [ ] Enum:
-  - Build
-  - Move
-  - Trade
-  - Discover
-  - Sacrifice
-  - Catastrophe
+- [x] Enum:
+  - [x] Build
+  - [x] Move (existing or new system target)
+  - [x] Trade
+  - [x] Sacrifice (unsupported stub)
+  - [x] Catastrophe (unsupported stub)
 
 #### 2. Action Validation
-- [ ] Rule checking per action
-- [ ] Invalid move → Result::Err
+- [x] Non-mutating validation for Build, Move, and Trade
+- [x] Invalid move → Result::Err
+- [ ] Full rule validation
+- [ ] Sacrifice and catastrophe validation
 
 #### 3. Turn System
 - [ ] Current player tracking
@@ -131,7 +137,7 @@ Minimal playable interface
 - [x] System rules
 - [x] Bank invariants
 - [x] GameState container and homeworld behavior
-- [ ] Action validation
+- [x] Initial action validation
 
 ### Integration Tests
 - [ ] Full turn sequences

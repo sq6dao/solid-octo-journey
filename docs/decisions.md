@@ -205,10 +205,96 @@ refer to systems.
 
 ---
 
+## 2026-05-12 – Initial Action Representation
+
+**Decision**
+Represent engine actions as a typed enum in `hw-engine`:
+- Build
+- Move with a target of an existing or new system
+- Trade
+- Sacrifice
+- Catastrophe
+
+Start with non-mutating validation over `&GameState`. Sacrifice and
+catastrophe are present as explicit unsupported variants.
+
+**Context**
+Phase 2 needs action representation before pure state transitions can be
+implemented. Current `hw-core` exposes immutable domain accessors, so this
+step validates action shape and references without changing state.
+
+**Alternatives**
+- Add action structs plus a trait hierarchy
+- Implement full state transitions immediately
+- Omit sacrifice and catastrophe until their rules are implemented
+
+**Consequences**
++ Engine callers can use one stable action type
++ Invalid actions return structured `ActionError` values
++ Validation can grow before mutation APIs are added to core
+- Action execution remains deferred
+- Sacrifice and catastrophe still need real rule validation
+
+---
+
+## 2026-05-12 – Full Action Validation
+
+**Decision**
+Validate action powers by requiring the acting player to have the matching
+color ship at the relevant system:
+- Green for Build
+- Yellow for Move
+- Blue for Trade
+
+Build also validates that the requested ship is the smallest available
+bank piece of that color.
+
+**Context**
+Action validation now covers per-action rule legality for supported
+actions while remaining non-mutating. Turn sequencing, sacrifice action
+budgets, red/capture behavior, and state transitions are still deferred.
+
+**Alternatives**
+- Keep validation limited to ownership and presence checks
+- Add turn sequencing and sacrifice budgets immediately
+- Wait for mutation APIs before validating color powers
+
+**Consequences**
++ Invalid action-power attempts return structured errors
++ Build validation now matches the smallest-available-piece rule
+- Turn-aware validation remains part of future engine work
+
+---
+
+## 2026-05-12 – Move Target Unification
+
+**Decision**
+Model discovery as a move to a new system. `Action::Move` now carries a
+target that is either an existing `SystemId` or a new system described by
+unowned star pieces.
+
+**Context**
+Homeworlds treats both movement to an existing system and discovery of a
+new system as yellow actions. Keeping them under one action variant makes
+the engine action model match that rule more directly.
+
+**Alternatives**
+- Keep separate Move and Discover action variants
+- Use optional destination fields on Move
+- Delay the merge until state-transition APIs exist
+
+**Consequences**
++ Existing-system movement and discovery share one validation path
++ Callers no longer need a separate Discover action shape
+- Existing callers must migrate to `MoveTarget::Existing` or
+  `MoveTarget::New`
+
+---
+
 ## Future Decisions (To Be Made)
 
 - Homeworld loss and win-condition validation
-- Action representation (command pattern vs enum-only)
+- Mutation APIs needed for pure state transitions
 - AI architecture
 - Serialization format (JSON vs binary)
 - Networking approach
