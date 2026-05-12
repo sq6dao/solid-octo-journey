@@ -364,6 +364,29 @@ state-transition support exists.
 
 ---
 
+## 2026-05-12 – Action Validation Module Layout
+
+**Decision**
+Keep one validation module per action under `hw-engine`. The Move
+validation module is stored in `move.rs` and declared as `mod r#move`
+because `move` is a Rust keyword.
+
+**Context**
+Action validation had grown into one large file. Splitting by action keeps
+each rule implementation small while preserving action-name-based file
+names.
+
+**Alternatives**
+- Keep all validation in one file
+- Use `move_action.rs` to avoid the raw identifier
+
+**Consequences**
++ Validation files now align with action names
++ The raw identifier is documented at the module declaration
+- Readers need to recognize Rust raw identifier syntax
+
+---
+
 ## Future Decisions (To Be Made)
 
 - Homeworld loss and win-condition validation
