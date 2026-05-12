@@ -213,6 +213,7 @@ Represent engine actions as a typed enum in `hw-engine`:
 - Move with a target of an existing or new system
 - Trade
 - Sacrifice
+- Invade
 - Catastrophe
 
 Start with non-mutating validation over `&GameState`.
@@ -267,6 +268,7 @@ color ship at the relevant system:
 - Green for Build
 - Yellow for Move
 - Blue for Trade
+- Red for Invade
 
 Build also validates that the requested ship is the smallest available
 bank piece of that color.
@@ -274,7 +276,7 @@ bank piece of that color.
 **Context**
 Action validation now covers per-action rule legality for supported
 actions while remaining non-mutating. Turn sequencing, sacrifice action
-budgets, red/capture behavior, and state transitions are still deferred.
+budgets, ownership changes, and state transitions are still deferred.
 
 **Alternatives**
 - Keep validation limited to ownership and presence checks
@@ -335,6 +337,30 @@ support exist.
 + Sacrifice is now a real validated action shape
 + Invalid sacrifice attempts reuse existing structured action errors
 - Size-based action budgets remain part of future turn-system work
+
+---
+
+## 2026-05-12 – Invade Validation
+
+**Decision**
+Represent the red action as `Invade`. Validate invade as a red-powered
+action targeting an opponent-owned ship at the selected system.
+
+Invade validation does not change ownership of the target ship.
+
+**Context**
+The engine now has a typed shape for all four color powers before pure
+state-transition support exists.
+
+**Alternatives**
+- Name the action Attack
+- Implement ownership mutation immediately
+- Keep the red action absent until state transitions exist
+
+**Consequences**
++ Red action legality is covered by non-mutating validation
++ Invalid own-ship invasions return a structured error
+- Ownership changes remain part of future state-transition work
 
 ---
 

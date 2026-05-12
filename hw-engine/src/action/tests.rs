@@ -49,6 +49,15 @@ fn actions_report_their_kind() {
         ActionKind::Sacrifice
     );
     assert_eq!(
+        Action::Invade {
+            player: Player::One,
+            system: SystemId::new(0),
+            target: owned_ship(Player::Two, Color::Blue, Size::Small),
+        }
+        .kind(),
+        ActionKind::Invade
+    );
+    assert_eq!(
         Action::Catastrophe {
             system: SystemId::new(0),
             color: Color::Blue,
@@ -673,6 +682,111 @@ fn sacrifice_validation_rejects_a_missing_ship() {
         Err(ActionError::ShipNotPresent {
             system: SystemId::new(0),
             ship,
+        })
+    );
+}
+
+#[test]
+fn invade_validation_accepts_an_opponent_ship_with_red_power() {
+    let state = valid_state();
+    let target = owned_ship(Player::One, Color::Blue, Size::Small);
+    let invade = Action::Invade {
+        player: Player::Two,
+        system: SystemId::new(0),
+        target,
+    };
+
+    assert_eq!(validate_action(&state, &invade), Ok(()));
+}
+
+#[test]
+fn invade_validation_rejects_an_unknown_system() {
+    let state = valid_state();
+    let target = owned_ship(Player::One, Color::Blue, Size::Small);
+    let invade = Action::Invade {
+        player: Player::Two,
+        system: SystemId::new(2),
+        target,
+    };
+
+    assert_eq!(
+        validate_action(&state, &invade),
+        Err(ActionError::UnknownSystem {
+            system: SystemId::new(2),
+        })
+    );
+}
+
+#[test]
+fn invade_validation_rejects_an_unowned_target() {
+    let state = valid_state();
+    let target = Piece::new(Color::Blue, Size::Small);
+    let invade = Action::Invade {
+        player: Player::Two,
+        system: SystemId::new(0),
+        target,
+    };
+
+    assert_eq!(
+        validate_action(&state, &invade),
+        Err(ActionError::UnownedShip { ship: target })
+    );
+}
+
+#[test]
+fn invade_validation_rejects_a_missing_target_ship() {
+    let state = valid_state();
+    let target = owned_ship(Player::One, Color::Green, Size::Large);
+    let invade = Action::Invade {
+        player: Player::Two,
+        system: SystemId::new(0),
+        target,
+    };
+
+    assert_eq!(
+        validate_action(&state, &invade),
+        Err(ActionError::ShipNotPresent {
+            system: SystemId::new(0),
+            ship: target,
+        })
+    );
+}
+
+#[test]
+fn invade_validation_rejects_a_target_owned_by_the_acting_player() {
+    let state = valid_state();
+    let target = owned_ship(Player::One, Color::Blue, Size::Small);
+    let invade = Action::Invade {
+        player: Player::One,
+        system: SystemId::new(0),
+        target,
+    };
+
+    assert_eq!(
+        validate_action(&state, &invade),
+        Err(ActionError::CannotInvadeOwnShip {
+            player: Player::One,
+            ship: target,
+        })
+    );
+}
+
+#[test]
+fn invade_validation_rejects_missing_red_power() {
+    let state = valid_state();
+    let target = owned_ship(Player::Two, Color::Red, Size::Medium);
+    let invade = Action::Invade {
+        player: Player::One,
+        system: SystemId::new(0),
+        target,
+    };
+
+    assert_eq!(
+        validate_action(&state, &invade),
+        Err(ActionError::MissingActionPower {
+            player: Player::One,
+            system: SystemId::new(0),
+            color: Color::Red,
         })
     );
 }

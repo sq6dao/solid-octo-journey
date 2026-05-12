@@ -24,6 +24,11 @@ pub enum Action {
         system: SystemId,
         ship: Piece,
     },
+    Invade {
+        player: Player,
+        system: SystemId,
+        target: Piece,
+    },
     Catastrophe {
         system: SystemId,
         color: Color,
@@ -37,6 +42,7 @@ impl Action {
             Self::Move { .. } => ActionKind::Move,
             Self::Trade { .. } => ActionKind::Trade,
             Self::Sacrifice { .. } => ActionKind::Sacrifice,
+            Self::Invade { .. } => ActionKind::Invade,
             Self::Catastrophe { .. } => ActionKind::Catastrophe,
         }
     }
@@ -54,5 +60,6 @@ pub enum ActionKind {
     Move,
     Trade,
     Sacrifice,
+    Invade,
     Catastrophe,
 }

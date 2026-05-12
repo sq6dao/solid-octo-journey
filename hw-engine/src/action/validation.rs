@@ -14,6 +14,10 @@ pub enum ActionError {
         player: Player,
         ship: Piece,
     },
+    CannotInvadeOwnShip {
+        player: Player,
+        ship: Piece,
+    },
     ShipNotPresent {
         system: SystemId,
         ship: Piece,
@@ -71,6 +75,11 @@ pub fn validate_action(state: &GameState, action: &Action) -> Result<(), ActionE
             system,
             ship,
         } => validate_sacrifice(state, *player, *system, *ship),
+        Action::Invade {
+            player,
+            system,
+            target,
+        } => validate_invade(state, *player, *system, *target),
         Action::Catastrophe { system, color } => validate_catastrophe(state, *system, *color),
     }
 }
@@ -148,6 +157,30 @@ fn validate_sacrifice(
     require_system(state, system)?;
     require_owned_by(player, ship)?;
     require_ship_present(state, system, ship)?;
+    Ok(())
+}
+
+fn validate_invade(
+    state: &GameState,
+    player: Player,
+    system: SystemId,
+    target: Piece,
+) -> Result<(), ActionError> {
+    require_system(state, system)?;
+
+    match target.owner() {
+        None => return Err(ActionError::UnownedShip { ship: target }),
+        Some(owner) if owner == player => {
+            return Err(ActionError::CannotInvadeOwnShip {
+                player,
+                ship: target,
+            });
+        }
+        Some(_) => {}
+    }
+
+    require_ship_present(state, system, target)?;
+    require_action_power(state, player, system, Color::Red)?;
     Ok(())
 }
 
