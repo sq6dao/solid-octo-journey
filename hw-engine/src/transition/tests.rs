@@ -268,6 +268,103 @@ fn apply_invade_action_returns_validation_errors() {
     );
 }
 
+#[test]
+fn apply_sacrifice_action_removes_the_ship_and_returns_it_to_the_bank() {
+    let state = valid_state();
+    let ship = owned_ship(Player::One, Color::Blue, Size::Small);
+    let action = Action::Sacrifice {
+        player: Player::One,
+        system: SystemId::new(0),
+        ship,
+    };
+
+    let next = apply_action(&state, &action).expect("action applies");
+
+    assert_eq!(
+        count_ship(next.system(SystemId::new(0)).expect("system exists"), ship),
+        0
+    );
+    assert_eq!(
+        next.bank().count(Color::Blue, Size::Small),
+        Bank::copies_per_piece() + 1
+    );
+}
+
+#[test]
+fn apply_sacrifice_action_prunes_an_empty_non_homeworld_system() {
+    let star = Piece::new(Color::Blue, Size::Medium);
+    let ship = owned_ship(Player::One, Color::Blue, Size::Small);
+    let state = state_with_systems_and_homeworlds(
+        Bank::new(),
+        vec![
+            StarSystem::new(
+                vec![Piece::new(Color::Yellow, Size::Small)],
+                vec![owned_ship(Player::One, Color::Green, Size::Small)],
+            )
+            .expect("system is valid"),
+            StarSystem::new(vec![star], vec![ship]).expect("system is valid"),
+            StarSystem::new(
+                vec![Piece::new(Color::Red, Size::Large)],
+                vec![owned_ship(Player::Two, Color::Red, Size::Medium)],
+            )
+            .expect("system is valid"),
+        ],
+        [SystemId::new(0), SystemId::new(2)],
+    );
+    let action = Action::Sacrifice {
+        player: Player::One,
+        system: SystemId::new(1),
+        ship,
+    };
+
+    let next = apply_action(&state, &action).expect("action applies");
+
+    assert_eq!(next.systems().len(), 2);
+    assert_eq!(next.homeworld(Player::Two), SystemId::new(1));
+    assert_eq!(
+        next.bank().count(Color::Blue, Size::Small),
+        Bank::copies_per_piece() + 1
+    );
+    assert_eq!(
+        next.bank().count(Color::Blue, Size::Medium),
+        Bank::copies_per_piece() + 1
+    );
+}
+
+#[test]
+fn apply_sacrifice_action_keeps_an_empty_homeworld() {
+    let ship = owned_ship(Player::One, Color::Blue, Size::Small);
+    let state = state_with_systems_and_homeworlds(
+        Bank::new(),
+        vec![
+            StarSystem::new(vec![Piece::new(Color::Yellow, Size::Small)], vec![ship])
+                .expect("system is valid"),
+            StarSystem::new(
+                vec![Piece::new(Color::Red, Size::Large)],
+                vec![owned_ship(Player::Two, Color::Red, Size::Medium)],
+            )
+            .expect("system is valid"),
+        ],
+        [SystemId::new(0), SystemId::new(1)],
+    );
+    let action = Action::Sacrifice {
+        player: Player::One,
+        system: SystemId::new(0),
+        ship,
+    };
+
+    let next = apply_action(&state, &action).expect("action applies");
+
+    assert_eq!(next.systems().len(), 2);
+    assert!(
+        next.system(SystemId::new(0))
+            .expect("system exists")
+            .ships()
+            .is_empty()
+    );
+    assert_eq!(next.homeworld(Player::One), SystemId::new(0));
+}
+
 fn valid_state() -> GameState {
     state_with_bank(Bank::new())
 }

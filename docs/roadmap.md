@@ -34,8 +34,8 @@
   Invade requires a same-size-or-larger acting-player ship in the target
   system.
 - `hw-engine` exposes pure `apply_action` state transitions. Build, Move,
-  Trade, and Invade are implemented; other actions currently validate and
-  report unsupported transition execution.
+  Trade, Invade, and Sacrifice are implemented; Catastrophe currently
+  validates and reports unsupported transition execution.
 - `hw-cli` is still a placeholder.
 - The workspace test suite currently covers core piece, bank, and star
   system invariants, `GameState` container behavior, and initial action
@@ -115,7 +115,7 @@ Encode all legal moves and transitions.
 - [x] Move
 - [x] Trade
 - [x] Invade
-- [ ] Sacrifice
+- [x] Sacrifice
 - [ ] Catastrophe
 
 ---

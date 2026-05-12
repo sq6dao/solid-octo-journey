@@ -3,6 +3,7 @@ mod invade;
 // `move` is a Rust keyword; use a raw identifier so the file can still
 // match the action name.
 mod r#move;
+mod sacrifice;
 mod shared;
 mod trade;
 
@@ -44,6 +45,11 @@ pub fn apply_action(state: &GameState, action: &Action) -> Result<GameState, Tra
             system,
             target,
         } => invade::apply(state, *player, *system, *target),
+        Action::Sacrifice {
+            player,
+            system,
+            ship,
+        } => sacrifice::apply(state, *player, *system, *ship),
         _ => Err(TransitionError::UnsupportedAction(action.kind())),
     }
 }

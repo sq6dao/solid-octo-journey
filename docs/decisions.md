@@ -569,6 +569,28 @@ needs to change target ownership in the selected system.
 
 ---
 
+## 2026-05-12 – Sacrifice Execution
+
+**Decision**
+Implement Sacrifice transitions by removing the selected owned ship,
+returning it to the bank unowned, and pruning the system if it becomes an
+empty non-homeworld.
+
+**Context**
+Sacrifice validation already checks ownership and presence. Turn budgets
+from sacrifice size remain a later turn-system concern.
+
+**Alternatives**
+- Wait for turn sequencing before removing sacrificed ships
+- Keep empty non-homeworld systems after sacrifice
+
+**Consequences**
++ Sacrifice now updates board and bank state
++ Empty homeworlds are preserved for later loss detection
+- Extra action budgets remain unimplemented until turn-system work
+
+---
+
 ## Future Decisions (To Be Made)
 
 - Homeworld loss and win-condition validation
