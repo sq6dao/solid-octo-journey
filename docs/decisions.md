@@ -142,6 +142,35 @@ Workspace includes a binary (`hw-cli`).
 
 ---
 
+## 2026-05-12 – Star System Domain Invariants
+
+**Decision**
+Represent a star system in `hw-core` as:
+- 1-2 unowned star pieces
+- one or more owned ship pieces
+- deterministic owner presence derived from `Player::ALL`
+
+Invalid star systems return `StarSystemError` instead of panicking.
+
+**Context**
+The roadmap's Star System step needs core-domain validation without
+introducing engine actions, turn flow, movement, discovery, or cleanup
+behavior.
+
+**Alternatives**
+- Allow empty systems and let the engine clean them up later
+- Model stars and ships as separate wrapper types immediately
+- Store owner presence separately from ships
+
+**Consequences**
++ Illegal board locations are rejected at construction time
++ Owner presence cannot drift from the ships in orbit
++ The core model stays deterministic and easy to test
+- Future engine transitions must remove or avoid empty systems
+- Wrapper types may still be useful once action rules become richer
+
+---
+
 ## Future Decisions (To Be Made)
 
 - Action representation (command pattern vs enum-only)

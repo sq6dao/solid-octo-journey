@@ -11,6 +11,21 @@
 
 ---
 
+## Current State
+- Workspace crates exist for `hw-core`, `hw-engine`, and `hw-cli`.
+- `hw-core` currently implements:
+  - `Color`, `Size`, `Player`, and `Piece`
+  - `Bank` with three copies of every color/size combination
+  - `StarSystem` with 1-2 unowned stars and one or more owned ships
+  - validation errors for invalid bank and star system construction
+- `StarSystem` exposes deterministic owner presence checks through
+  `has_presence` and `owners_present`.
+- `hw-engine` and `hw-cli` are still placeholders.
+- The workspace test suite currently covers core piece, bank, and star
+  system invariants.
+
+---
+
 ## Phase 1 – Core Domain (hw-core)
 
 ### Goal
@@ -34,10 +49,11 @@ Model all fundamental game concepts with no engine logic.
 - [x] Validation (no negative counts)
 
 #### 4. Star System
-- [ ] Star = 1–2 pieces
-- [ ] Ships orbiting
-- [ ] Owner presence
-- [ ] Validation rules
+- [x] Star = 1–2 pieces
+- [x] Ships orbiting
+- [x] Owner presence
+- [x] Validation rules
+- [x] `StarSystemError` for invalid construction
 
 #### 5. GameState (domain only)
 - [ ] Systems collection
@@ -103,8 +119,9 @@ Minimal playable interface
 ## Phase 5 – Testing Expansion
 
 ### Unit Tests
-- [ ] Piece invariants
-- [ ] System rules
+- [x] Piece invariants
+- [x] System rules
+- [x] Bank invariants
 - [ ] Action validation
 
 ### Integration Tests
