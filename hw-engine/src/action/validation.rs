@@ -1,6 +1,6 @@
 use hw_core::{Color, GameState, Piece, Player, Size, StarSystem, StarSystemError, SystemId};
 
-use super::{Action, ActionKind, MoveTarget};
+use super::{Action, MoveTarget};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ActionError {
@@ -45,9 +45,6 @@ pub enum ActionError {
         color: Color,
         count: usize,
     },
-    UnsupportedAction {
-        kind: ActionKind,
-    },
 }
 
 pub fn validate_action(state: &GameState, action: &Action) -> Result<(), ActionError> {
@@ -69,10 +66,12 @@ pub fn validate_action(state: &GameState, action: &Action) -> Result<(), ActionE
             from,
             to,
         } => validate_trade(state, *player, *system, *from, *to),
+        Action::Sacrifice {
+            player,
+            system,
+            ship,
+        } => validate_sacrifice(state, *player, *system, *ship),
         Action::Catastrophe { system, color } => validate_catastrophe(state, *system, *color),
-        Action::Sacrifice { .. } => Err(ActionError::UnsupportedAction {
-            kind: action.kind(),
-        }),
     }
 }
 
@@ -137,6 +136,18 @@ fn validate_trade(
     }
 
     require_bank_piece(state, to)?;
+    Ok(())
+}
+
+fn validate_sacrifice(
+    state: &GameState,
+    player: Player,
+    system: SystemId,
+    ship: Piece,
+) -> Result<(), ActionError> {
+    require_system(state, system)?;
+    require_owned_by(player, ship)?;
+    require_ship_present(state, system, ship)?;
     Ok(())
 }
 

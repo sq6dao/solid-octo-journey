@@ -215,8 +215,7 @@ Represent engine actions as a typed enum in `hw-engine`:
 - Sacrifice
 - Catastrophe
 
-Start with non-mutating validation over `&GameState`. Sacrifice is present
-as an explicit unsupported variant.
+Start with non-mutating validation over `&GameState`.
 
 **Context**
 Phase 2 needs action representation before pure state transitions can be
@@ -233,7 +232,6 @@ step validates action shape and references without changing state.
 + Invalid actions return structured `ActionError` values
 + Validation can grow before mutation APIs are added to core
 - Action execution remains deferred
-- Sacrifice still needs real rule validation
 
 ---
 
@@ -312,6 +310,31 @@ the engine action model match that rule more directly.
 + Callers no longer need a separate Discover action shape
 - Existing callers must migrate to `MoveTarget::Existing` or
   `MoveTarget::New`
+
+---
+
+## 2026-05-12 – Sacrifice Validation
+
+**Decision**
+Validate sacrifice as ownership plus presence at the selected system. The
+sacrificed ship must belong to the acting player and be present in the
+referenced system.
+
+Sacrifice validation does not remove the ship or grant extra actions.
+
+**Context**
+Sacrifice can now be validated before turn sequencing and action-budget
+support exist.
+
+**Alternatives**
+- Allow sacrificing any present ship
+- Implement size-based action budgets immediately
+- Keep sacrifice unsupported until the turn system exists
+
+**Consequences**
++ Sacrifice is now a real validated action shape
++ Invalid sacrifice attempts reuse existing structured action errors
+- Size-based action budgets remain part of future turn-system work
 
 ---
 

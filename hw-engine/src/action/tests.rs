@@ -595,7 +595,7 @@ fn catastrophe_validation_rejects_an_unknown_system() {
 }
 
 #[test]
-fn sacrifice_is_explicitly_unsupported() {
+fn sacrifice_validation_accepts_an_owned_ship_present_at_the_system() {
     let state = valid_state();
     let sacrifice = Action::Sacrifice {
         player: Player::One,
@@ -603,10 +603,76 @@ fn sacrifice_is_explicitly_unsupported() {
         ship: owned_ship(Player::One, Color::Blue, Size::Small),
     };
 
+    assert_eq!(validate_action(&state, &sacrifice), Ok(()));
+}
+
+#[test]
+fn sacrifice_validation_rejects_an_unknown_system() {
+    let state = valid_state();
+    let sacrifice = Action::Sacrifice {
+        player: Player::One,
+        system: SystemId::new(2),
+        ship: owned_ship(Player::One, Color::Blue, Size::Small),
+    };
+
     assert_eq!(
         validate_action(&state, &sacrifice),
-        Err(ActionError::UnsupportedAction {
-            kind: ActionKind::Sacrifice,
+        Err(ActionError::UnknownSystem {
+            system: SystemId::new(2),
+        })
+    );
+}
+
+#[test]
+fn sacrifice_validation_rejects_an_unowned_ship() {
+    let state = valid_state();
+    let ship = Piece::new(Color::Blue, Size::Small);
+    let sacrifice = Action::Sacrifice {
+        player: Player::One,
+        system: SystemId::new(0),
+        ship,
+    };
+
+    assert_eq!(
+        validate_action(&state, &sacrifice),
+        Err(ActionError::UnownedShip { ship })
+    );
+}
+
+#[test]
+fn sacrifice_validation_rejects_the_wrong_owner() {
+    let state = valid_state();
+    let ship = owned_ship(Player::Two, Color::Blue, Size::Small);
+    let sacrifice = Action::Sacrifice {
+        player: Player::One,
+        system: SystemId::new(0),
+        ship,
+    };
+
+    assert_eq!(
+        validate_action(&state, &sacrifice),
+        Err(ActionError::WrongOwner {
+            player: Player::One,
+            ship,
+        })
+    );
+}
+
+#[test]
+fn sacrifice_validation_rejects_a_missing_ship() {
+    let state = valid_state();
+    let ship = owned_ship(Player::One, Color::Green, Size::Large);
+    let sacrifice = Action::Sacrifice {
+        player: Player::One,
+        system: SystemId::new(0),
+        ship,
+    };
+
+    assert_eq!(
+        validate_action(&state, &sacrifice),
+        Err(ActionError::ShipNotPresent {
+            system: SystemId::new(0),
+            ship,
         })
     );
 }
