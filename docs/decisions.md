@@ -146,7 +146,7 @@ Workspace includes a binary (`hw-cli`).
 
 **Decision**
 Represent a star system in `hw-core` as:
-- 1-2 unowned star pieces
+- 0-2 unowned star pieces
 - one or more owned ship pieces
 - deterministic owner presence derived from `Player::ALL`
 
@@ -155,24 +155,59 @@ Invalid star systems return `StarSystemError` instead of panicking.
 **Context**
 The roadmap's Star System step needs core-domain validation without
 introducing engine actions, turn flow, movement, discovery, or cleanup
-behavior.
+behavior. A 0-star system lets core represent a homeworld after its stars
+are gone; loss validation is handled later.
 
 **Alternatives**
-- Allow empty systems and let the engine clean them up later
+- Require at least one star on every system
 - Model stars and ships as separate wrapper types immediately
 - Store owner presence separately from ships
 
 **Consequences**
-+ Illegal board locations are rejected at construction time
++ Homeworlds with no stars can be represented for later loss checks
 + Owner presence cannot drift from the ships in orbit
 + The core model stays deterministic and easy to test
-- Future engine transitions must remove or avoid empty systems
+- Future engine transitions may need to clean up non-homeworld 0-star
+  systems
 - Wrapper types may still be useful once action rules become richer
+
+---
+
+## 2026-05-12 – GameState System Identity and Homeworlds
+
+**Decision**
+Introduce `SystemId` and use it in `GameState` to track:
+- ordered `StarSystem` values
+- exactly one distinct homeworld per `Player`
+- current `Bank` state
+
+`GameState::new` validates that every homeworld ID points at an existing
+system and that players do not share a homeworld.
+
+**Context**
+The roadmap's GameState step includes systems collection, player
+homeworlds, and bank state. Engine actions will also need a strong way to
+refer to systems.
+
+**Alternatives**
+- Use `usize` indices as temporary system identifiers
+- Track player homeworlds by embedding flags in `StarSystem`
+- Allow players to share one homeworld system
+- Treat missing player presence or 0-star homeworlds as construction
+  errors
+
+**Consequences**
++ Core can now pass a full board-and-bank snapshot to future engine code
++ Future actions can target systems through a strong type
++ Invalid or duplicate homeworld assignments are rejected
+- `SystemId` is currently index-backed
+- Win/loss validation remains a later game-flow concern
 
 ---
 
 ## Future Decisions (To Be Made)
 
+- Homeworld loss and win-condition validation
 - Action representation (command pattern vs enum-only)
 - AI architecture
 - Serialization format (JSON vs binary)

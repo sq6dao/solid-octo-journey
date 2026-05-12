@@ -16,13 +16,19 @@
 - `hw-core` currently implements:
   - `Color`, `Size`, `Player`, and `Piece`
   - `Bank` with three copies of every color/size combination
-  - `StarSystem` with 1-2 unowned stars and one or more owned ships
-  - validation errors for invalid bank and star system construction
+  - `SystemId` as a typed identifier for systems in a `GameState`
+  - `StarSystem` with 0-2 unowned stars and one or more owned ships
+  - `GameState` as a domain container for systems, player homeworlds,
+    and bank state
+  - validation errors for invalid bank, star system, and game state
+    construction
 - `StarSystem` exposes deterministic owner presence checks through
   `has_presence` and `owners_present`.
+- `GameState` requires exactly one distinct homeworld per player, but
+  homeworld loss checks are deferred.
 - `hw-engine` and `hw-cli` are still placeholders.
 - The workspace test suite currently covers core piece, bank, and star
-  system invariants.
+  system invariants, plus the current `GameState` container behavior.
 
 ---
 
@@ -49,16 +55,18 @@ Model all fundamental game concepts with no engine logic.
 - [x] Validation (no negative counts)
 
 #### 4. Star System
-- [x] Star = 1–2 pieces
+- [x] Star = 0–2 pieces
 - [x] Ships orbiting
 - [x] Owner presence
 - [x] Validation rules
 - [x] `StarSystemError` for invalid construction
 
 #### 5. GameState (domain only)
-- [ ] Systems collection
-- [ ] Player homeworlds
-- [ ] Bank state
+- [x] Systems collection
+- [x] Player homeworlds
+- [x] Bank state
+- [x] `SystemId` for typed system references
+- [x] `GameStateError` for invalid construction
 
 ---
 
@@ -122,6 +130,7 @@ Minimal playable interface
 - [x] Piece invariants
 - [x] System rules
 - [x] Bank invariants
+- [x] GameState container and homeworld behavior
 - [ ] Action validation
 
 ### Integration Tests
