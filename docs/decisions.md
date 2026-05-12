@@ -410,6 +410,28 @@ size ordering so same-or-larger invasion checks are deterministic.
 
 ---
 
+## 2026-05-12 – Discovery Star Bank Validation
+
+**Decision**
+Validate `MoveTarget::New` discovery stars against the bank, including
+duplicate color/size requests.
+
+**Context**
+Discovery consumes stars from the bank once transitions exist. Validating
+availability before transitions keeps invalid moves from reaching state
+mutation code.
+
+**Alternatives**
+- Validate only the discovered system shape
+- Defer bank availability to transition execution
+
+**Consequences**
++ Discovery legality now accounts for bank exhaustion
++ Transition code can rely on discovery stars being drawable
+- Move validation needs to count duplicate requested stars
+
+---
+
 ## Future Decisions (To Be Made)
 
 - Homeworld loss and win-condition validation

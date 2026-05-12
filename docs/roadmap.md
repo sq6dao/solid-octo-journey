@@ -28,7 +28,8 @@
   homeworld loss checks are deferred.
 - `hw-engine` currently defines typed actions and non-mutating validation
   for Build, Move, Trade, Sacrifice, Invade, and Catastrophe. Move
-  targets can be existing systems or newly discovered systems.
+  targets can be existing systems or newly discovered systems. Discovery
+  validation requires requested stars to be available in the bank.
 - `hw-cli` is still a placeholder.
 - The workspace test suite currently covers core piece, bank, and star
   system invariants, `GameState` container behavior, and initial action

@@ -29,6 +29,24 @@ pub(super) fn validate(
         StarSystem::new(stars.to_vec(), vec![ship])
             .map(|_| ())
             .map_err(|error| ActionError::InvalidDiscovery { error })?;
+        require_discovery_stars_available(state, stars)?;
+    }
+
+    Ok(())
+}
+
+fn require_discovery_stars_available(
+    state: &GameState,
+    stars: &[Piece],
+) -> Result<(), ActionError> {
+    for star in stars {
+        let requested_count = stars
+            .iter()
+            .filter(|other| other.color() == star.color() && other.size() == star.size())
+            .count();
+        if usize::from(state.bank().count(star.color(), star.size())) < requested_count {
+            return Err(ActionError::PieceUnavailable { piece: *star });
+        }
     }
 
     Ok(())

@@ -461,6 +461,45 @@ fn move_validation_rejects_invalid_new_system_stars() {
 }
 
 #[test]
+fn move_validation_rejects_an_unavailable_discovery_star() {
+    let state = state_with_empty_bank_piece(Color::Red, Size::Large);
+    let star = Piece::new(Color::Red, Size::Large);
+    let action = Action::Move {
+        player: Player::One,
+        from: SystemId::new(0),
+        ship: owned_ship(Player::One, Color::Blue, Size::Small),
+        target: MoveTarget::New { stars: vec![star] },
+    };
+
+    assert_eq!(
+        validate_action(&state, &action),
+        Err(ActionError::PieceUnavailable { piece: star })
+    );
+}
+
+#[test]
+fn move_validation_rejects_duplicate_discovery_stars_exceeding_the_bank() {
+    let mut bank = Bank::new();
+    bank.draw(Color::Red, Size::Large).expect("piece exists");
+    bank.draw(Color::Red, Size::Large).expect("piece exists");
+    let state = state_with_bank(bank);
+    let star = Piece::new(Color::Red, Size::Large);
+    let action = Action::Move {
+        player: Player::One,
+        from: SystemId::new(0),
+        ship: owned_ship(Player::One, Color::Blue, Size::Small),
+        target: MoveTarget::New {
+            stars: vec![star, star],
+        },
+    };
+
+    assert_eq!(
+        validate_action(&state, &action),
+        Err(ActionError::PieceUnavailable { piece: star })
+    );
+}
+
+#[test]
 fn move_validation_rejects_missing_yellow_power_for_a_new_system_target() {
     let state = state_with_primary_ships(vec![
         owned_ship(Player::One, Color::Blue, Size::Small),
