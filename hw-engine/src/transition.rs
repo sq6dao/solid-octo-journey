@@ -1,4 +1,7 @@
 mod build;
+// `move` is a Rust keyword; use a raw identifier so the file can still
+// match the action name.
+mod r#move;
 mod shared;
 
 use hw_core::{GameState, GameStateError, StarSystemError};
@@ -22,6 +25,12 @@ pub fn apply_action(state: &GameState, action: &Action) -> Result<GameState, Tra
             system,
             ship,
         } => build::apply(state, *player, *system, *ship),
+        Action::Move {
+            player,
+            from,
+            ship,
+            target,
+        } => r#move::apply(state, *player, *from, *ship, target),
         _ => Err(TransitionError::UnsupportedAction(action.kind())),
     }
 }

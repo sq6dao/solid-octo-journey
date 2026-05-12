@@ -500,6 +500,30 @@ returns a new `GameState`.
 
 ---
 
+## 2026-05-12 – Move Execution and Pruning
+
+**Decision**
+Implement Move transitions for existing-system targets and new discovery
+targets. Prune non-homeworld systems that have no ships after movement,
+returning remaining pieces to the bank and compacting system IDs.
+
+**Context**
+Move is the first transition that can remove a ship from one system and
+therefore needs engine-level cleanup. Homeworld systems remain in the
+state even when their last ship leaves.
+
+**Alternatives**
+- Keep empty non-homeworld systems indefinitely
+- Use tombstones instead of compacting `SystemId` values
+- Delay discovery execution until a later transition pass
+
+**Consequences**
++ Move produces game states without empty non-homeworld systems
++ Discovery consumes stars from the bank during transition execution
+- Callers must use the returned state after ID compaction
+
+---
+
 ## Future Decisions (To Be Made)
 
 - Homeworld loss and win-condition validation
