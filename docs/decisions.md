@@ -475,6 +475,31 @@ the ship-size rule determines which opponent ships can be captured there.
 
 ---
 
+## 2026-05-12 – Transition API and Build Execution
+
+**Decision**
+Expose `apply_action(&GameState, &Action) -> Result<GameState,
+TransitionError>` from `hw-engine`. Implement Build execution first and
+return `UnsupportedAction` for other valid actions until their transition
+commits land.
+
+**Context**
+The engine already validates actions without mutating state. State
+transitions now need a pure public entry point that validates first and
+returns a new `GameState`.
+
+**Alternatives**
+- Consume `GameState` and `Action` by value
+- Add a larger engine or turn-state type immediately
+- Implement all action transitions in one commit
+
+**Consequences**
++ Callers get a deterministic transition API
++ Each action transition can land as a separate tested commit
+- Unsupported transition errors are temporary while the action commits land
+
+---
+
 ## Future Decisions (To Be Made)
 
 - Homeworld loss and win-condition validation
