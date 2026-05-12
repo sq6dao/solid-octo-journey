@@ -215,8 +215,8 @@ Represent engine actions as a typed enum in `hw-engine`:
 - Sacrifice
 - Catastrophe
 
-Start with non-mutating validation over `&GameState`. Sacrifice and
-catastrophe are present as explicit unsupported variants.
+Start with non-mutating validation over `&GameState`. Sacrifice is present
+as an explicit unsupported variant.
 
 **Context**
 Phase 2 needs action representation before pure state transitions can be
@@ -233,7 +233,31 @@ step validates action shape and references without changing state.
 + Invalid actions return structured `ActionError` values
 + Validation can grow before mutation APIs are added to core
 - Action execution remains deferred
-- Sacrifice and catastrophe still need real rule validation
+- Sacrifice still needs real rule validation
+
+---
+
+## 2026-05-12 – Catastrophe Validation
+
+**Decision**
+Validate catastrophe as an overpopulation-only action. A catastrophe is
+legal when the target system contains 4 or more pieces of the selected
+color, counting both stars and ships.
+
+Catastrophe validation does not remove pieces or return them to the bank.
+
+**Context**
+Catastrophe can now be represented and validated before the engine has
+pure state-transition support.
+
+**Alternatives**
+- Allow catastrophe for any positive piece count
+- Keep catastrophe unsupported until state mutation exists
+
+**Consequences**
++ Catastrophe legality now matches the overpopulation rule
++ Invalid catastrophes return structured `NoCatastrophe` errors
+- Applying catastrophe effects remains part of future state transitions
 
 ---
 

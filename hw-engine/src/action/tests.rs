@@ -521,28 +521,92 @@ fn move_validation_rejects_the_wrong_owner_for_a_new_system_target() {
 }
 
 #[test]
-fn sacrifice_and_catastrophe_are_explicitly_unsupported() {
+fn catastrophe_validation_accepts_four_same_color_pieces() {
+    let state = state_with_catastrophe_count(Color::Red, 4);
+    let action = Action::Catastrophe {
+        system: SystemId::new(0),
+        color: Color::Red,
+    };
+
+    assert_eq!(validate_action(&state, &action), Ok(()));
+}
+
+#[test]
+fn catastrophe_validation_counts_stars_and_ships() {
+    let state = state_with_bank_and_systems(
+        Bank::new(),
+        vec![
+            StarSystem::new(
+                vec![
+                    Piece::new(Color::Red, Size::Small),
+                    Piece::new(Color::Red, Size::Medium),
+                ],
+                vec![
+                    owned_ship(Player::One, Color::Red, Size::Small),
+                    owned_ship(Player::Two, Color::Red, Size::Large),
+                ],
+            )
+            .expect("system is valid"),
+            secondary_system(),
+        ],
+    );
+    let action = Action::Catastrophe {
+        system: SystemId::new(0),
+        color: Color::Red,
+    };
+
+    assert_eq!(validate_action(&state, &action), Ok(()));
+}
+
+#[test]
+fn catastrophe_validation_rejects_zero_to_three_same_color_pieces() {
+    for count in 0..4 {
+        let state = state_with_catastrophe_count(Color::Red, count);
+        let action = Action::Catastrophe {
+            system: SystemId::new(0),
+            color: Color::Red,
+        };
+
+        assert_eq!(
+            validate_action(&state, &action),
+            Err(ActionError::NoCatastrophe {
+                system: SystemId::new(0),
+                color: Color::Red,
+                count,
+            })
+        );
+    }
+}
+
+#[test]
+fn catastrophe_validation_rejects_an_unknown_system() {
+    let state = valid_state();
+    let action = Action::Catastrophe {
+        system: SystemId::new(2),
+        color: Color::Blue,
+    };
+
+    assert_eq!(
+        validate_action(&state, &action),
+        Err(ActionError::UnknownSystem {
+            system: SystemId::new(2),
+        })
+    );
+}
+
+#[test]
+fn sacrifice_is_explicitly_unsupported() {
     let state = valid_state();
     let sacrifice = Action::Sacrifice {
         player: Player::One,
         system: SystemId::new(0),
         ship: owned_ship(Player::One, Color::Blue, Size::Small),
     };
-    let catastrophe = Action::Catastrophe {
-        system: SystemId::new(0),
-        color: Color::Blue,
-    };
 
     assert_eq!(
         validate_action(&state, &sacrifice),
         Err(ActionError::UnsupportedAction {
             kind: ActionKind::Sacrifice,
-        })
-    );
-    assert_eq!(
-        validate_action(&state, &catastrophe),
-        Err(ActionError::UnsupportedAction {
-            kind: ActionKind::Catastrophe,
         })
     );
 }
@@ -597,20 +661,55 @@ fn state_with_primary_ships(ships: Vec<Piece>) -> GameState {
 }
 
 fn state_with_primary_ships_and_bank(bank: Bank, ships: Vec<Piece>) -> GameState {
-    GameState::new(
+    state_with_bank_and_systems(
+        bank,
         vec![
             StarSystem::new(vec![Piece::new(Color::Yellow, Size::Small)], ships)
                 .expect("system is valid"),
-            StarSystem::new(
-                vec![Piece::new(Color::Green, Size::Medium)],
-                vec![owned_ship(Player::Two, Color::Yellow, Size::Small)],
-            )
-            .expect("system is valid"),
+            secondary_system(),
         ],
-        [SystemId::new(0), SystemId::new(1)],
-        bank,
     )
-    .expect("state is valid")
+}
+
+fn state_with_catastrophe_count(color: Color, count: usize) -> GameState {
+    state_with_bank_and_systems(
+        Bank::new(),
+        vec![system_with_color_count(color, count), secondary_system()],
+    )
+}
+
+fn state_with_bank_and_systems(bank: Bank, systems: Vec<StarSystem>) -> GameState {
+    GameState::new(systems, [SystemId::new(0), SystemId::new(1)], bank).expect("state is valid")
+}
+
+fn system_with_color_count(color: Color, count: usize) -> StarSystem {
+    let mut stars = Vec::new();
+    let star_count = count.min(2);
+    for size in [Size::Small, Size::Medium].into_iter().take(star_count) {
+        stars.push(Piece::new(color, size));
+    }
+
+    let mut ships = Vec::new();
+    for size in [Size::Small, Size::Medium, Size::Large]
+        .into_iter()
+        .take(count.saturating_sub(star_count))
+    {
+        ships.push(owned_ship(Player::One, color, size));
+    }
+
+    if ships.is_empty() {
+        ships.push(owned_ship(Player::One, Color::Blue, Size::Small));
+    }
+
+    StarSystem::new(stars, ships).expect("system is valid")
+}
+
+fn secondary_system() -> StarSystem {
+    StarSystem::new(
+        vec![Piece::new(Color::Green, Size::Medium)],
+        vec![owned_ship(Player::Two, Color::Yellow, Size::Small)],
+    )
+    .expect("system is valid")
 }
 
 fn owned_ship(player: Player, color: Color, size: Size) -> Piece {

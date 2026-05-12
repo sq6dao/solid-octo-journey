@@ -27,9 +27,9 @@
 - `GameState` requires exactly one distinct homeworld per player, but
   homeworld loss checks are deferred.
 - `hw-engine` currently defines typed actions and non-mutating validation
-  for Build, Move, and Trade. Move targets can be existing systems or
-  newly discovered systems. Sacrifice and catastrophe are represented but
-  return unsupported errors.
+  for Build, Move, Trade, and Catastrophe. Move targets can be existing
+  systems or newly discovered systems. Sacrifice is represented but
+  returns unsupported errors.
 - `hw-cli` is still a placeholder.
 - The workspace test suite currently covers core piece, bank, and star
   system invariants, `GameState` container behavior, and initial action
@@ -88,13 +88,14 @@ Encode all legal moves and transitions.
   - [x] Move (existing or new system target)
   - [x] Trade
   - [x] Sacrifice (unsupported stub)
-  - [x] Catastrophe (unsupported stub)
+  - [x] Catastrophe
 
 #### 2. Action Validation
-- [x] Non-mutating validation for Build, Move, and Trade
+- [x] Non-mutating validation for Build, Move, Trade, and
+  Catastrophe
 - [x] Invalid move → Result::Err
 - [ ] Full rule validation
-- [ ] Sacrifice and catastrophe validation
+- [ ] Sacrifice validation
 
 #### 3. Turn System
 - [ ] Current player tracking

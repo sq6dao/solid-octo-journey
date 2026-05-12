@@ -40,6 +40,11 @@ pub enum ActionError {
     InvalidDiscovery {
         error: StarSystemError,
     },
+    NoCatastrophe {
+        system: SystemId,
+        color: Color,
+        count: usize,
+    },
     UnsupportedAction {
         kind: ActionKind,
     },
@@ -64,11 +69,10 @@ pub fn validate_action(state: &GameState, action: &Action) -> Result<(), ActionE
             from,
             to,
         } => validate_trade(state, *player, *system, *from, *to),
-        Action::Sacrifice { .. } | Action::Catastrophe { .. } => {
-            Err(ActionError::UnsupportedAction {
-                kind: action.kind(),
-            })
-        }
+        Action::Catastrophe { system, color } => validate_catastrophe(state, *system, *color),
+        Action::Sacrifice { .. } => Err(ActionError::UnsupportedAction {
+            kind: action.kind(),
+        }),
     }
 }
 
@@ -134,6 +138,32 @@ fn validate_trade(
 
     require_bank_piece(state, to)?;
     Ok(())
+}
+
+fn validate_catastrophe(
+    state: &GameState,
+    system: SystemId,
+    color: Color,
+) -> Result<(), ActionError> {
+    let system_ref = state
+        .system(system)
+        .ok_or(ActionError::UnknownSystem { system })?;
+    let count = system_ref
+        .stars()
+        .iter()
+        .chain(system_ref.ships())
+        .filter(|piece| piece.color() == color)
+        .count();
+
+    if count >= 4 {
+        Ok(())
+    } else {
+        Err(ActionError::NoCatastrophe {
+            system,
+            color,
+            count,
+        })
+    }
 }
 
 fn require_system(state: &GameState, system: SystemId) -> Result<(), ActionError> {
