@@ -29,7 +29,8 @@
 - `hw-engine` currently defines typed actions and non-mutating validation
   for Build, Move, Trade, Sacrifice, Invade, and Catastrophe. Move
   targets can be existing systems or newly discovered systems. Discovery
-  validation requires requested stars to be available in the bank.
+  validation requires requested stars to be available in the bank, and
+  Move rejects target systems that share a star size with the source.
 - `hw-cli` is still a placeholder.
 - The workspace test suite currently covers core piece, bank, and star
   system invariants, `GameState` container behavior, and initial action

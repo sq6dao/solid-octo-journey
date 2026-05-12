@@ -433,11 +433,63 @@ fn move_validation_accepts_a_new_system_target() {
         from: SystemId::new(0),
         ship: owned_ship(Player::One, Color::Blue, Size::Small),
         target: MoveTarget::New {
-            stars: vec![Piece::new(Color::Yellow, Size::Small)],
+            stars: vec![Piece::new(Color::Red, Size::Medium)],
         },
     };
 
     assert_eq!(validate_action(&state, &action), Ok(()));
+}
+
+#[test]
+fn move_validation_rejects_existing_target_with_a_shared_star_size() {
+    let state = state_with_bank_and_systems(
+        Bank::new(),
+        vec![
+            StarSystem::new(
+                vec![Piece::new(Color::Yellow, Size::Small)],
+                vec![
+                    owned_ship(Player::One, Color::Blue, Size::Small),
+                    owned_ship(Player::One, Color::Yellow, Size::Small),
+                ],
+            )
+            .expect("system is valid"),
+            StarSystem::new(
+                vec![Piece::new(Color::Red, Size::Small)],
+                vec![owned_ship(Player::Two, Color::Green, Size::Small)],
+            )
+            .expect("system is valid"),
+        ],
+    );
+    let action = move_action(
+        Player::One,
+        SystemId::new(0),
+        SystemId::new(1),
+        Color::Blue,
+        Size::Small,
+    );
+
+    assert_eq!(
+        validate_action(&state, &action),
+        Err(ActionError::StarSizeConflict { size: Size::Small })
+    );
+}
+
+#[test]
+fn move_validation_rejects_new_target_with_a_shared_star_size() {
+    let state = valid_state();
+    let action = Action::Move {
+        player: Player::One,
+        from: SystemId::new(0),
+        ship: owned_ship(Player::One, Color::Blue, Size::Small),
+        target: MoveTarget::New {
+            stars: vec![Piece::new(Color::Red, Size::Small)],
+        },
+    };
+
+    assert_eq!(
+        validate_action(&state, &action),
+        Err(ActionError::StarSizeConflict { size: Size::Small })
+    );
 }
 
 #[test]

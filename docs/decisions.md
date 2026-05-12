@@ -432,6 +432,28 @@ mutation code.
 
 ---
 
+## 2026-05-12 – Move Star Size Validation
+
+**Decision**
+Reject Move actions when the source system and target system share any
+star size. This applies to existing-system targets and new discovery
+targets.
+
+**Context**
+Homeworlds systems are identified by star sizes. A ship cannot move or
+discover between systems that overlap in star size.
+
+**Alternatives**
+- Validate only system IDs and piece ownership
+- Defer size conflicts to transition execution
+
+**Consequences**
++ Invalid Move actions fail before transition execution
++ Discovery uses the same star-size rule as existing-system movement
+- Move validation now depends on target star details
+
+---
+
 ## Future Decisions (To Be Made)
 
 - Homeworld loss and win-condition validation

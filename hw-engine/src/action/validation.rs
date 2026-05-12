@@ -8,7 +8,7 @@ mod sacrifice;
 mod shared;
 mod trade;
 
-use hw_core::{Color, GameState, Piece, Player, StarSystemError, SystemId};
+use hw_core::{Color, GameState, Piece, Player, Size, StarSystemError, SystemId};
 
 use super::Action;
 
@@ -34,6 +34,9 @@ pub enum ActionError {
     },
     SameSystem {
         system: SystemId,
+    },
+    StarSizeConflict {
+        size: Size,
     },
     PieceUnavailable {
         piece: Piece,
