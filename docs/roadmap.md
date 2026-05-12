@@ -31,6 +31,8 @@
   targets can be existing systems or newly discovered systems. Discovery
   validation requires requested stars to be available in the bank, and
   Move rejects target systems that share a star size with the source.
+  Invade requires a same-size-or-larger acting-player ship in the target
+  system.
 - `hw-cli` is still a placeholder.
 - The workspace test suite currently covers core piece, bank, and star
   system invariants, `GameState` container behavior, and initial action

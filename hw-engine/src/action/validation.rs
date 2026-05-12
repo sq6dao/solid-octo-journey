@@ -28,6 +28,10 @@ pub enum ActionError {
         player: Player,
         ship: Piece,
     },
+    CannotInvadeLargerShip {
+        player: Player,
+        target: Piece,
+    },
     ShipNotPresent {
         system: SystemId,
         ship: Piece,

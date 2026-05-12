@@ -8,7 +8,9 @@ pub(super) fn validate(
     system: SystemId,
     target: Piece,
 ) -> Result<(), ActionError> {
-    shared::require_system(state, system)?;
+    let system_ref = state
+        .system(system)
+        .ok_or(ActionError::UnknownSystem { system })?;
 
     match target.owner() {
         None => return Err(ActionError::UnownedShip { ship: target }),
@@ -23,5 +25,13 @@ pub(super) fn validate(
 
     shared::require_ship_present(state, system, target)?;
     shared::require_action_power(state, player, system, Color::Red)?;
+    if !system_ref
+        .ships()
+        .iter()
+        .any(|ship| ship.is_owned_by(player) && ship.size() >= target.size())
+    {
+        return Err(ActionError::CannotInvadeLargerShip { player, target });
+    }
+
     Ok(())
 }

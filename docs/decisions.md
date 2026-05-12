@@ -454,6 +454,27 @@ discover between systems that overlap in star size.
 
 ---
 
+## 2026-05-12 – Invade Ship Size Validation
+
+**Decision**
+Require Invade actions to have an acting-player ship in the target system
+whose size is greater than or equal to the target ship size.
+
+**Context**
+Red action power determines whether a player can invade in a system, but
+the ship-size rule determines which opponent ships can be captured there.
+
+**Alternatives**
+- Let any red ship invade any opponent ship
+- Apply the size check only during transition execution
+
+**Consequences**
++ Oversized target ships are rejected during validation
++ Invade transition code can rely on size legality
+- Invade validation now checks both color power and ship size
+
+---
+
 ## Future Decisions (To Be Made)
 
 - Homeworld loss and win-condition validation

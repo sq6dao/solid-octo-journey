@@ -791,6 +791,22 @@ fn invade_validation_accepts_an_opponent_ship_with_red_power() {
 }
 
 #[test]
+fn invade_validation_accepts_an_opponent_ship_of_the_same_size() {
+    let target = owned_ship(Player::Two, Color::Blue, Size::Medium);
+    let state = state_with_primary_ships(vec![
+        owned_ship(Player::One, Color::Red, Size::Medium),
+        target,
+    ]);
+    let invade = Action::Invade {
+        player: Player::One,
+        system: SystemId::new(0),
+        target,
+    };
+
+    assert_eq!(validate_action(&state, &invade), Ok(()));
+}
+
+#[test]
 fn invade_validation_rejects_an_unknown_system() {
     let state = valid_state();
     let target = owned_ship(Player::One, Color::Blue, Size::Small);
@@ -878,6 +894,28 @@ fn invade_validation_rejects_missing_red_power() {
             player: Player::One,
             system: SystemId::new(0),
             color: Color::Red,
+        })
+    );
+}
+
+#[test]
+fn invade_validation_rejects_a_larger_target_ship() {
+    let target = owned_ship(Player::Two, Color::Blue, Size::Medium);
+    let state = state_with_primary_ships(vec![
+        owned_ship(Player::One, Color::Red, Size::Small),
+        target,
+    ]);
+    let invade = Action::Invade {
+        player: Player::One,
+        system: SystemId::new(0),
+        target,
+    };
+
+    assert_eq!(
+        validate_action(&state, &invade),
+        Err(ActionError::CannotInvadeLargerShip {
+            player: Player::One,
+            target,
         })
     );
 }
