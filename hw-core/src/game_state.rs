@@ -216,6 +216,26 @@ mod tests {
     }
 
     #[test]
+    fn game_state_allows_a_homeworld_with_zero_ships() {
+        let systems = vec![
+            StarSystem::new(vec![Piece::new(Color::Yellow, Size::Small)], vec![])
+                .expect("system is valid"),
+            valid_system(Player::Two, Color::Blue, Color::Red),
+        ];
+
+        let state = GameState::new(systems, [SystemId::new(0), SystemId::new(1)], Bank::new())
+            .expect("state is valid");
+
+        assert!(
+            state
+                .system(state.homeworld(Player::One))
+                .expect("homeworld exists")
+                .ships()
+                .is_empty()
+        );
+    }
+
+    #[test]
     fn game_state_accessors_do_not_consume_the_state() {
         let state = valid_game_state();
 

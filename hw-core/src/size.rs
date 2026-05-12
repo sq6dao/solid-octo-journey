@@ -1,4 +1,4 @@
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Size {
     Small,
     Medium,
@@ -25,5 +25,12 @@ mod tests {
     #[test]
     fn sizes_are_the_three_piece_sizes() {
         assert_eq!(Size::ALL, [Size::Small, Size::Medium, Size::Large]);
+    }
+
+    #[test]
+    fn sizes_are_ordered_by_ship_strength() {
+        assert!(Size::Small < Size::Medium);
+        assert!(Size::Medium < Size::Large);
+        assert!(Size::Large >= Size::Small);
     }
 }

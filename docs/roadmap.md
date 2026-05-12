@@ -17,7 +17,7 @@
   - `Color`, `Size`, `Player`, and `Piece`
   - `Bank` with three copies of every color/size combination
   - `SystemId` as a typed identifier for systems in a `GameState`
-  - `StarSystem` with 0-2 unowned stars and one or more owned ships
+  - `StarSystem` with 0-2 unowned stars and zero or more owned ships
   - `GameState` as a domain container for systems, player homeworlds,
     and bank state
   - validation errors for invalid bank, star system, and game state

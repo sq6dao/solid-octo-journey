@@ -387,6 +387,29 @@ names.
 
 ---
 
+## 2026-05-12 – Transition System States
+
+**Decision**
+Allow `StarSystem` values with zero ships, and derive size ordering from
+`Small < Medium < Large`.
+
+**Context**
+Pure state transitions need to represent intermediate homeworld states
+after the last ship leaves. Invade validation also needs an explicit ship
+size ordering so same-or-larger invasion checks are deterministic.
+
+**Alternatives**
+- Keep rejecting zero-ship systems
+- Add a separate transition-only system representation
+- Compare sizes with ad hoc match expressions in the engine
+
+**Consequences**
++ Homeworld loss can be detected later without changing `GameState`
++ Engine validation can compare ship sizes directly
+- Non-homeworld cleanup must be handled by engine transitions
+
+---
+
 ## Future Decisions (To Be Made)
 
 - Homeworld loss and win-condition validation

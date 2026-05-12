@@ -4,7 +4,6 @@ use crate::{Piece, Player};
 pub enum StarSystemError {
     TooManyStars,
     OwnedStar,
-    NoShips,
     UnownedShip,
 }
 
@@ -22,10 +21,6 @@ impl StarSystem {
 
         if stars.iter().any(Piece::is_owned) {
             return Err(StarSystemError::OwnedStar);
-        }
-
-        if ships.is_empty() {
-            return Err(StarSystemError::NoShips);
         }
 
         if ships.iter().any(|ship| !ship.is_owned()) {
@@ -119,13 +114,12 @@ mod tests {
     }
 
     #[test]
-    fn star_system_rejects_zero_ships() {
+    fn star_system_can_be_constructed_with_zero_ships() {
         let stars = vec![Piece::new(Color::Yellow, Size::Small)];
 
-        assert_eq!(
-            StarSystem::new(stars, vec![]),
-            Err(StarSystemError::NoShips)
-        );
+        let system = StarSystem::new(stars, vec![]).expect("system is valid");
+
+        assert!(system.ships().is_empty());
     }
 
     #[test]
