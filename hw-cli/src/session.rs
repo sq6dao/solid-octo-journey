@@ -157,7 +157,12 @@ where
     let mut game = prompted.game;
 
     writeln!(output, "Game started.")?;
-    write!(output, "{}", render_turn_summary(&game))?;
+    let render_full_after_setup = prompted.history.is_none() && prompted.show_after;
+    if render_full_after_setup {
+        write!(output, "{}", render_game(&game))?;
+    } else {
+        write!(output, "{}", render_turn_summary(&game))?;
+    }
     if let Some(history) = prompted.history {
         writeln!(output, "Running commands from {}.", history.path.display())?;
         if run_loaded_history(history, &mut game, &mut output, 1, &typed_history)?
@@ -165,7 +170,7 @@ where
         {
             return Ok(());
         }
-    } else {
+    } else if !render_full_after_setup {
         render_after_semicolon(prompted.show_after, &game, &mut output)?;
     }
 
@@ -500,23 +505,25 @@ where
     W: Write,
 {
     loop {
-        let player_one = match prompt_setup(input, output, Player::One, typed_history)? {
-            SetupPrompt::Setup(setup) => setup,
-            SetupPrompt::Loaded(prompted) => return Ok(Some(prompted)),
-            SetupPrompt::Eof => return Ok(None),
-        };
-        let player_two = match prompt_setup(input, output, Player::Two, typed_history)? {
-            SetupPrompt::Setup(setup) => setup,
-            SetupPrompt::Loaded(prompted) => return Ok(Some(prompted)),
-            SetupPrompt::Eof => return Ok(None),
-        };
+        let (player_one, player_one_show_after) =
+            match prompt_setup(input, output, Player::One, typed_history)? {
+                SetupPrompt::Setup { setup, show_after } => (setup, show_after),
+                SetupPrompt::Loaded(prompted) => return Ok(Some(prompted)),
+                SetupPrompt::Eof => return Ok(None),
+            };
+        let (player_two, player_two_show_after) =
+            match prompt_setup(input, output, Player::Two, typed_history)? {
+                SetupPrompt::Setup { setup, show_after } => (setup, show_after),
+                SetupPrompt::Loaded(prompted) => return Ok(Some(prompted)),
+                SetupPrompt::Eof => return Ok(None),
+            };
 
         match Game::new([player_one, player_two], Player::One) {
             Ok(game) => {
                 return Ok(Some(PromptedGame {
                     game,
                     history: None,
-                    show_after: false,
+                    show_after: player_one_show_after || player_two_show_after,
                 }));
             }
             Err(error) => {
@@ -531,7 +538,10 @@ where
 }
 
 enum SetupPrompt {
-    Setup(HomeworldSetup),
+    Setup {
+        setup: HomeworldSetup,
+        show_after: bool,
+    },
     Loaded(PromptedGame),
     Eof,
 }
@@ -554,6 +564,7 @@ where
         };
         let stars_line = stars.trim();
         record_user_history(input, typed_history, stars_line)?;
+        let stars_show_after = command_requests_state_after_error(stars_line);
 
         if let Some(parsed) = parse_setup_load(stars_line) {
             match parsed {
@@ -573,9 +584,10 @@ where
         };
         let ship_line = ship.trim();
         record_user_history(input, typed_history, ship_line)?;
+        let show_after = stars_show_after || command_requests_state_after_error(ship_line);
 
         match parse_setup(stars_line, ship_line, player) {
-            Ok(setup) => return Ok(SetupPrompt::Setup(setup)),
+            Ok(setup) => return Ok(SetupPrompt::Setup { setup, show_after }),
             Err(error) => writeln!(output, "Error: {}", error.message())?,
         }
     }
@@ -857,6 +869,26 @@ q
         assert!(output.contains("Error: unknown command"));
         assert!(output.contains("Current player: Player 1"));
         assert!(output.contains("Remaining actions: 1"));
+    }
+
+    #[test]
+    fn setup_semicolon_prints_state_once_after_setup() {
+        let output = run_script(
+            "ys bm;
+gs;
+bl rl;
+rm;
+q
+",
+        );
+
+        assert!(!output.contains("Error:"));
+        assert!(output.contains("Game started."));
+        assert_eq!(output.matches("Status: in progress").count(), 1);
+        assert_eq!(output.matches("Current player: Player 1").count(), 1);
+        assert_eq!(output.matches("Remaining actions: 1").count(), 1);
+        assert!(output.contains("[0] homeworld Player 1"));
+        assert!(output.contains("[1] homeworld Player 2"));
     }
 
     #[test]

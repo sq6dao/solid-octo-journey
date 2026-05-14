@@ -116,6 +116,9 @@ pub fn parse_setup(
     ship_line: &str,
     player: Player,
 ) -> Result<HomeworldSetup, ParseError> {
+    let (stars_line, _) = strip_show_suffix(stars_line)?;
+    let (ship_line, _) = strip_show_suffix(ship_line)?;
+
     let stars = parse_piece_list(&tokenize(stars_line))?;
     if stars.len() != 2 {
         return Err(ParseError::new("homeworld setup needs exactly two stars"));
@@ -576,6 +579,16 @@ mod tests {
                 Piece::owned(Color::Green, Size::Medium, Player::One),
             ))
         );
+        assert_eq!(
+            parse_setup("ys bl;", "gm;", Player::One),
+            Ok(HomeworldSetup::new(
+                vec![
+                    Piece::new(Color::Yellow, Size::Small),
+                    Piece::new(Color::Blue, Size::Large),
+                ],
+                Piece::owned(Color::Green, Size::Medium, Player::One),
+            ))
+        );
     }
 
     #[test]
@@ -594,5 +607,6 @@ mod tests {
             "homeworld setup needs exactly two stars"
         );
         assert!(parse_setup("ys bl rm", "gm", Player::One).is_err());
+        assert!(parse_setup("ys; bl", "gm", Player::One).is_err());
     }
 }

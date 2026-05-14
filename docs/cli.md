@@ -30,6 +30,9 @@ Player 2 stars> bl rl
 Player 2 ship> rm
 ```
 
+Setup lines may also end with `;`. If any setup line uses it, the CLI
+prints the full game state once after setup completes.
+
 You can also load a save or command history from the setup prompt:
 
 ```text
@@ -137,7 +140,8 @@ turn stays with the current player at 0 actions so they can either run a
 ## Semicolon Shortcut
 
 Append `;` as the final character of a command to print the game state
-after the command runs:
+after the command runs. During setup, append `;` to any setup line to
+print the initial game state once after setup completes:
 
 ```text
 b 0 gs;
