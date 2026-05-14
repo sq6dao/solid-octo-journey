@@ -33,6 +33,10 @@ pub enum GameError {
     PieceUnavailable {
         piece: Piece,
     },
+    InvalidHomeworldStarCount {
+        player: Player,
+        count: usize,
+    },
     WrongHomeworldShipOwner {
         player: Player,
         ship: Piece,
@@ -77,11 +81,17 @@ impl Game {
     pub fn default(starting_player: Player) -> Self {
         let homeworlds = [
             HomeworldSetup::new(
-                vec![Piece::new(Color::Yellow, Size::Small)],
+                vec![
+                    Piece::new(Color::Yellow, Size::Small),
+                    Piece::new(Color::Blue, Size::Medium),
+                ],
                 Piece::owned(Color::Green, Size::Small, Player::One),
             ),
             HomeworldSetup::new(
-                vec![Piece::new(Color::Blue, Size::Large)],
+                vec![
+                    Piece::new(Color::Red, Size::Small),
+                    Piece::new(Color::Blue, Size::Large),
+                ],
                 Piece::owned(Color::Red, Size::Medium, Player::Two),
             ),
         ];
@@ -133,6 +143,13 @@ fn build_homeworld(
     player: Player,
     setup: HomeworldSetup,
 ) -> Result<StarSystem, GameError> {
+    if setup.stars.len() != 2 {
+        return Err(GameError::InvalidHomeworldStarCount {
+            player,
+            count: setup.stars.len(),
+        });
+    }
+
     if setup.ship.owner() != Some(player) {
         return Err(GameError::WrongHomeworldShipOwner {
             player,
@@ -199,8 +216,20 @@ mod tests {
         let two_ship = Piece::owned(Color::Red, Size::Medium, Player::Two);
         let game = Game::new(
             [
-                HomeworldSetup::new(vec![Piece::new(Color::Yellow, Size::Small)], one_ship),
-                HomeworldSetup::new(vec![Piece::new(Color::Blue, Size::Large)], two_ship),
+                HomeworldSetup::new(
+                    vec![
+                        Piece::new(Color::Yellow, Size::Small),
+                        Piece::new(Color::Blue, Size::Medium),
+                    ],
+                    one_ship,
+                ),
+                HomeworldSetup::new(
+                    vec![
+                        Piece::new(Color::Red, Size::Large),
+                        Piece::new(Color::Blue, Size::Large),
+                    ],
+                    two_ship,
+                ),
             ],
             Player::Two,
         )
@@ -217,7 +246,10 @@ mod tests {
                 .system(SystemId::new(0))
                 .expect("system exists")
                 .stars(),
-            &[Piece::new(Color::Yellow, Size::Small)]
+            &[
+                Piece::new(Color::Yellow, Size::Small),
+                Piece::new(Color::Blue, Size::Medium),
+            ]
         );
         assert_eq!(
             state
@@ -231,7 +263,10 @@ mod tests {
                 .system(SystemId::new(1))
                 .expect("system exists")
                 .stars(),
-            &[Piece::new(Color::Blue, Size::Large)]
+            &[
+                Piece::new(Color::Red, Size::Large),
+                Piece::new(Color::Blue, Size::Large),
+            ]
         );
         assert_eq!(
             state
@@ -253,9 +288,55 @@ mod tests {
             Bank::copies_per_piece() - 1
         );
         assert_eq!(
+            state.bank().count(Color::Blue, Size::Medium),
+            Bank::copies_per_piece() - 1
+        );
+        assert_eq!(
+            state.bank().count(Color::Red, Size::Large),
+            Bank::copies_per_piece() - 1
+        );
+        assert_eq!(
             state.bank().count(Color::Red, Size::Medium),
             Bank::copies_per_piece() - 1
         );
+    }
+
+    #[test]
+    fn setup_rejects_homeworlds_without_two_stars() {
+        for stars in [
+            vec![],
+            vec![Piece::new(Color::Yellow, Size::Small)],
+            vec![
+                Piece::new(Color::Yellow, Size::Small),
+                Piece::new(Color::Blue, Size::Medium),
+                Piece::new(Color::Red, Size::Large),
+            ],
+        ] {
+            let count = stars.len();
+
+            assert_eq!(
+                Game::new(
+                    [
+                        HomeworldSetup::new(
+                            stars,
+                            Piece::owned(Color::Green, Size::Small, Player::One),
+                        ),
+                        HomeworldSetup::new(
+                            vec![
+                                Piece::new(Color::Blue, Size::Large),
+                                Piece::new(Color::Red, Size::Medium),
+                            ],
+                            Piece::owned(Color::Red, Size::Medium, Player::Two),
+                        ),
+                    ],
+                    Player::One,
+                ),
+                Err(GameError::InvalidHomeworldStarCount {
+                    player: Player::One,
+                    count,
+                })
+            );
+        }
     }
 
     #[test]
@@ -265,9 +346,18 @@ mod tests {
         assert_eq!(
             Game::new(
                 [
-                    HomeworldSetup::new(vec![Piece::new(Color::Yellow, Size::Small)], ship),
                     HomeworldSetup::new(
-                        vec![Piece::new(Color::Blue, Size::Large)],
+                        vec![
+                            Piece::new(Color::Yellow, Size::Small),
+                            Piece::new(Color::Blue, Size::Medium),
+                        ],
+                        ship,
+                    ),
+                    HomeworldSetup::new(
+                        vec![
+                            Piece::new(Color::Blue, Size::Large),
+                            Piece::new(Color::Red, Size::Large),
+                        ],
                         Piece::owned(Color::Red, Size::Medium, Player::Two),
                     ),
                 ],
@@ -286,11 +376,17 @@ mod tests {
             Game::new(
                 [
                     HomeworldSetup::new(
-                        vec![Piece::owned(Color::Yellow, Size::Small, Player::One)],
+                        vec![
+                            Piece::owned(Color::Yellow, Size::Small, Player::One),
+                            Piece::new(Color::Blue, Size::Medium),
+                        ],
                         Piece::owned(Color::Green, Size::Small, Player::One),
                     ),
                     HomeworldSetup::new(
-                        vec![Piece::new(Color::Blue, Size::Large)],
+                        vec![
+                            Piece::new(Color::Blue, Size::Large),
+                            Piece::new(Color::Red, Size::Large),
+                        ],
                         Piece::owned(Color::Red, Size::Medium, Player::Two),
                     ),
                 ],
@@ -315,7 +411,10 @@ mod tests {
                         Piece::owned(Color::Yellow, Size::Small, Player::One),
                     ),
                     HomeworldSetup::new(
-                        vec![Piece::new(Color::Blue, Size::Large)],
+                        vec![
+                            Piece::new(Color::Blue, Size::Large),
+                            Piece::new(Color::Red, Size::Medium),
+                        ],
                         Piece::owned(Color::Yellow, Size::Small, Player::Two),
                     ),
                 ],
@@ -336,6 +435,24 @@ mod tests {
         assert_eq!(game.turn().state().systems().len(), 2);
         assert_eq!(game.turn().state().homeworld(Player::One), SystemId::new(0));
         assert_eq!(game.turn().state().homeworld(Player::Two), SystemId::new(1));
+        assert_eq!(
+            game.turn()
+                .state()
+                .system(SystemId::new(0))
+                .expect("system exists")
+                .stars()
+                .len(),
+            2
+        );
+        assert_eq!(
+            game.turn()
+                .state()
+                .system(SystemId::new(1))
+                .expect("system exists")
+                .stars()
+                .len(),
+            2
+        );
     }
 
     #[test]

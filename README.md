@@ -22,13 +22,13 @@ From the repository root:
 cargo run -p hw-cli
 ```
 
-The CLI prompts for Player 1 and Player 2 homeworld setup. Enter one or
+The CLI prompts for Player 1 and Player 2 homeworld setup. Enter exactly
 two stars, then one starting ship:
 
 ```text
-Player 1 stars> ys
+Player 1 stars> ys bm
 Player 1 ship> gs
-Player 2 stars> bl
+Player 2 stars> bl rl
 Player 2 ship> rm
 ```
 

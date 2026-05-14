@@ -15,13 +15,13 @@ summaries, errors, and state renders to standard output.
 
 ## Homeworld Setup
 
-At startup, each player enters one or two stars and one starting ship.
+At startup, each player enters exactly two stars and one starting ship.
 Player 1's homeworld is system `0`; Player 2's homeworld is system `1`.
 
 ```text
-Player 1 stars> ys
+Player 1 stars> ys bm
 Player 1 ship> gs
-Player 2 stars> bl
+Player 2 stars> bl rl
 Player 2 ship> rm
 ```
 
@@ -123,9 +123,9 @@ show; q  # rejected
 
 ```text
 cargo run -p hw-cli
-Player 1 stars> ys
+Player 1 stars> ys bm
 Player 1 ship> gs
-Player 2 stars> bl
+Player 2 stars> bl rl
 Player 2 ship> rm
 P1> show
 P1> b 0 gs;

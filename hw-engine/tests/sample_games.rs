@@ -112,7 +112,10 @@ fn catastrophe_win_game() -> Game {
     Game::new(
         [
             setup(
-                vec![piece(Color::Yellow, Size::Large)],
+                vec![
+                    piece(Color::Yellow, Size::Large),
+                    piece(Color::Blue, Size::Large),
+                ],
                 ship(Player::One, Color::Green, Size::Small),
             ),
             setup(

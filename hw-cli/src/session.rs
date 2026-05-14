@@ -192,9 +192,9 @@ mod tests {
     #[test]
     fn show_prints_the_current_game_state() {
         let output = run_script(
-            "ys
+            "ys bm
 gs
-bl
+bl rl
 rm
 show
 q
@@ -205,10 +205,10 @@ q
         assert!(output.contains("Player 1 stars> "));
         assert!(output.contains("Game started."));
         assert!(output.contains("[0] homeworld Player 1"));
-        assert!(output.contains("Stars: ys"));
+        assert!(output.contains("Stars: ys, bm"));
         assert!(output.contains("Ships: P1 gs"));
         assert!(output.contains("[1] homeworld Player 2"));
-        assert!(output.contains("Stars: bl"));
+        assert!(output.contains("Stars: bl, rl"));
         assert!(output.contains("Ships: P2 rm"));
         assert!(output.contains("Goodbye."));
     }
@@ -216,9 +216,9 @@ q
     #[test]
     fn invalid_commands_do_not_advance_the_turn() {
         let output = run_script(
-            "ys
+            "ys bm
 gs
-bl
+bl rl
 rm
 nonsense
 show
@@ -234,9 +234,9 @@ q
     #[test]
     fn short_action_notation_drives_hot_seat_turns() {
         let output = run_script(
-            "ys
+            "ys bm
 gs
-bl
+bl rl
 rm
 b 0 gs
 e
@@ -256,7 +256,7 @@ q
         let output = run_script(
             "gs gm
 gl
-ys
+ys bl
 gs
 b 0 gs
 e
@@ -273,9 +273,9 @@ q
     #[test]
     fn semicolon_prints_state_after_a_successful_command() {
         let output = run_script(
-            "ys
+            "ys bm
 gs
-bl
+bl rl
 rm
 b 0 gs;
 q
@@ -290,9 +290,9 @@ q
     #[test]
     fn show_with_semicolon_only_prints_state_once() {
         let output = run_script(
-            "ys
+            "ys bm
 gs
-bl
+bl rl
 rm
 show;
 q
@@ -305,9 +305,9 @@ q
     #[test]
     fn semicolon_does_not_print_state_after_an_error() {
         let output = run_script(
-            "ys
+            "ys bm
 gs
-bl
+bl rl
 rm
 bad;
 q

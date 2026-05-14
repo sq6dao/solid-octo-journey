@@ -89,8 +89,8 @@ pub fn parse_setup(
     player: Player,
 ) -> Result<HomeworldSetup, ParseError> {
     let stars = parse_piece_list(&tokenize(stars_line))?;
-    if !(1..=2).contains(&stars.len()) {
-        return Err(ParseError::new("homeworld setup needs one or two stars"));
+    if stars.len() != 2 {
+        return Err(ParseError::new("homeworld setup needs exactly two stars"));
     }
 
     let ships = parse_piece_list(&tokenize(ship_line))?;
@@ -513,6 +513,12 @@ mod tests {
         assert!(parse_command("b 0", Player::One).is_err());
         assert!(parse_command("t 0 ys maybe 1", Player::One).is_err());
         assert!(parse_command("catastrophe 0 purple", Player::One).is_err());
+        assert_eq!(
+            parse_setup("ys", "gm", Player::One)
+                .expect_err("one star setup is invalid")
+                .message(),
+            "homeworld setup needs exactly two stars"
+        );
         assert!(parse_setup("ys bl rm", "gm", Player::One).is_err());
     }
 }

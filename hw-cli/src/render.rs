@@ -196,11 +196,17 @@ mod tests {
         let game = Game::new(
             [
                 HomeworldSetup::new(
-                    vec![Piece::new(Color::Yellow, Size::Small)],
+                    vec![
+                        Piece::new(Color::Yellow, Size::Small),
+                        Piece::new(Color::Blue, Size::Medium),
+                    ],
                     Piece::owned(Color::Green, Size::Small, Player::One),
                 ),
                 HomeworldSetup::new(
-                    vec![Piece::new(Color::Blue, Size::Large)],
+                    vec![
+                        Piece::new(Color::Blue, Size::Large),
+                        Piece::new(Color::Red, Size::Large),
+                    ],
                     Piece::owned(Color::Red, Size::Medium, Player::Two),
                 ),
             ],
@@ -214,12 +220,12 @@ mod tests {
         assert!(rendered.contains("Current player: Player 1"));
         assert!(rendered.contains("Remaining actions: 1"));
         assert!(rendered.contains("[0] homeworld Player 1"));
-        assert!(rendered.contains("Stars: ys"));
+        assert!(rendered.contains("Stars: ys, bm"));
         assert!(rendered.contains("Ships: P1 gs"));
         assert!(rendered.contains("[1] homeworld Player 2"));
-        assert!(rendered.contains("Stars: bl"));
+        assert!(rendered.contains("Stars: bl, rl"));
         assert!(rendered.contains("Ships: P2 rm"));
-        assert!(rendered.contains("red: small=3 medium=2 large=3"));
+        assert!(rendered.contains("red: small=3 medium=2 large=2"));
         assert!(rendered.contains("green: small=2 medium=3 large=3"));
     }
 
@@ -244,7 +250,10 @@ mod tests {
         let game = Game::new(
             [
                 HomeworldSetup::new(
-                    vec![Piece::new(Color::Yellow, Size::Small)],
+                    vec![
+                        Piece::new(Color::Yellow, Size::Small),
+                        Piece::new(Color::Blue, Size::Large),
+                    ],
                     Piece::owned(Color::Green, Size::Small, Player::One),
                 ),
                 HomeworldSetup::new(

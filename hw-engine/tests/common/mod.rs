@@ -30,11 +30,17 @@ pub fn simple_game(starting_player: Player) -> Game {
     Game::new(
         [
             setup(
-                vec![piece(Color::Yellow, Size::Small)],
+                vec![
+                    piece(Color::Red, Size::Medium),
+                    piece(Color::Red, Size::Medium),
+                ],
                 ship(Player::One, Color::Green, Size::Small),
             ),
             setup(
-                vec![piece(Color::Blue, Size::Large)],
+                vec![
+                    piece(Color::Blue, Size::Large),
+                    piece(Color::Blue, Size::Large),
+                ],
                 ship(Player::Two, Color::Green, Size::Small),
             ),
         ],
