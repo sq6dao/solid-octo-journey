@@ -103,9 +103,9 @@ Encode all legal moves and transitions.
 - [x] Full rule validation
 
 #### 3. Turn System
-- [ ] Current player tracking
-- [ ] Turn switching
-- [ ] Multi-action turns (via sacrifice)
+- [x] Current player tracking
+- [x] Turn switching
+- [x] Multi-action turns (via sacrifice)
 
 #### 4. State Transitions
 - [x] Pure functions: `GameState -> Action -> GameState`

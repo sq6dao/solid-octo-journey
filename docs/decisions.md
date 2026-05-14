@@ -618,6 +618,40 @@ overpopulation.
 
 ---
 
+## 2026-05-14 – Turn Orchestration
+
+**Decision**
+Track turn flow in `hw-engine` with `TurnState`, layered over the pure
+`GameState -> Action -> Result<GameState>` transition API.
+
+`TurnState` stores the current player, remaining paid actions, and any
+sacrifice-granted action-kind limit. Normal turns start with one paid
+action. `end_turn` is explicit and only succeeds once paid action budget
+is exhausted.
+
+Catastrophes remain playerless, explicit, and cost 0 actions. They can
+be applied before or after paid actions, including when no paid actions
+remain, and unresolved catastrophes do not block ending the turn.
+
+**Context**
+The roadmap calls for current player tracking, turn switching, and
+multi-action turns via sacrifice. Existing action validation and
+transitions already handle individual actions without knowing turn
+state.
+
+**Alternatives**
+- Embed current-player and action-budget fields in `hw-core::GameState`
+- Replace `apply_action` with a turn-only action application API
+- Auto-resolve or require pending catastrophes before turn end
+
+**Consequences**
++ Core state remains focused on board, homeworld, and bank data
++ Low-level pure transitions stay available for tests and future tools
++ Sacrifice budgets are enforced without duplicating action validation
+- Callers that need legal play flow must use `TurnState`
+
+---
+
 ## Future Decisions (To Be Made)
 
 - Homeworld loss and win-condition validation
