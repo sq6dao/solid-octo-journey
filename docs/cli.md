@@ -13,6 +13,11 @@ cargo run -p hw-cli
 The game reads commands from standard input and writes prompts, turn
 summaries, errors, and state renders to standard output.
 
+When standard input is an interactive terminal, the CLI supports in-line
+editing and arrow-key history. Up/down browse setup lines and commands
+typed in the current run. Replayed commands are not added to this
+history, and history does not persist after the CLI exits.
+
 ## Homeworld Setup
 
 At startup, each player enters exactly two stars and one starting ship.

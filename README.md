@@ -8,6 +8,15 @@ A modular Rust engine for a two-player Homeworlds-style game.
 - `hw-engine`: actions, validation, transitions, turns, and game flow.
 - `hw-cli`: simple text hot-seat interface.
 
+## Current Features
+
+- Strongly typed core model for pieces, banks, systems, and players.
+- Deterministic engine game loop with turns, sacrifice budgets, automatic
+  turn end when safe, and terminal game status.
+- Hand-editable YAML save/load support.
+- Text hot-seat CLI with short commands, command replay files, session
+  history saves, and interactive arrow-key editing.
+
 ## Run Tests
 
 ```sh
@@ -21,6 +30,13 @@ From the repository root:
 ```sh
 cargo run -p hw-cli
 ```
+
+In an interactive terminal, use the arrow keys to browse current-session
+history and edit the current line before pressing Enter.
+
+Interactive history is session-only. It includes setup lines and typed
+commands, but not commands replayed from files and not `save-history` /
+`sh` itself.
 
 The CLI prompts for Player 1 and Player 2 homeworld setup. Enter exactly
 two stars, then one starting ship:

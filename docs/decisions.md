@@ -714,8 +714,70 @@ describing movement to existing systems and discovery of new systems.
 
 ---
 
+## 2026-05-14 – YAML Save Format
+
+**Decision**
+Use YAML as the v1 save format. Saves are plaintext and hand-editable,
+with `version: 1` at the top and explicit fields for status, turn,
+homeworlds, bank, and systems.
+
+Save metadata may include `history` and `commands` at the end. `history`
+is archival CLI input and is not replayed. `commands` is replayed by the
+CLI after loading the saved state. Normal `save` output omits both fields;
+`save-history` / `sh` writes `history` only.
+
+**Context**
+Serialization needs to support fast manual scenario editing, regression
+testing, and later AI/TUI work. The CLI also needs a way to replay small
+command scripts without making replay the default save behavior.
+
+**Alternatives**
+- TOML: familiar and simple, but less natural for nested board state
+- RON: close to Rust types, but less common for hand editing
+- JSON: widely supported, but noisier for manual editing
+- Binary: compact, but poor for inspection and manual scenario changes
+
+**Consequences**
++ Saves are easy to inspect and edit during development
++ Replay commands can be embedded intentionally without changing normal
+  save behavior
++ Archived typed history can be preserved without accidentally replaying
+  it
+- The v1 schema must remain careful about compatibility as fields evolve
+
+---
+
+## 2026-05-14 – CLI Line Editing
+
+**Decision**
+Use `rustyline` for interactive terminal input in `hw-cli`, with
+session-only history and no persisted history file.
+
+The line editor is used only when standard input is an interactive
+terminal. Piped input, tests, and replay files continue to use the
+scripted buffered-input path. Interactive history is shared across setup
+prompts and game commands, records non-empty typed lines, excludes
+replayed commands, and excludes `save-history` / `sh`.
+
+**Context**
+The hot-seat CLI should support arrow keys for browsing recent commands
+and editing the current line, while preserving deterministic scripted
+input for tests and scenario files.
+
+**Alternatives**
+- Hand-roll terminal raw mode and escape handling
+- Use `reedline` for a larger configurable editing stack
+- Persist history across launches in a project or user config file
+
+**Consequences**
++ Arrow-key history and in-line editing work in normal terminal play
++ Tests and command replay remain deterministic and independent of a TTY
++ No new workspace or user-level history files are created
+- Interactive editing behavior depends on terminal support
+
+---
+
 ## Future Decisions (To Be Made)
 
 - AI architecture
-- Serialization format (JSON vs binary)
 - Networking approach
