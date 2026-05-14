@@ -98,3 +98,7 @@ pub fn validate_action(state: &GameState, action: &Action) -> Result<(), ActionE
         Action::Catastrophe { system, color } => catastrophe::validate(state, *system, *color),
     }
 }
+
+pub fn has_possible_catastrophe(state: &GameState) -> bool {
+    catastrophe::has_possible(state)
+}

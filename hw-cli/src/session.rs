@@ -5,7 +5,7 @@ use std::{
 };
 
 use hw_core::Player;
-use hw_engine::{Game, HomeworldSetup, save};
+use hw_engine::{Game, GameStatus, HomeworldSetup, has_possible_catastrophe, save};
 
 use crate::{
     parser::{ParsedCommand, parse_input, parse_setup},
@@ -195,6 +195,7 @@ fn run_command<W: Write>(
                     Ok(next) => {
                         *game = next;
                         writeln!(output, "Action applied.")?;
+                        auto_end_turn_if_ready(game, output)?;
                         write!(output, "{}", render_turn_summary(game))?;
                         render_after_semicolon(parsed.show_after, game, output)?;
                     }
@@ -217,6 +218,25 @@ fn run_command<W: Write>(
 fn command_requests_state_after_error(command: &str) -> bool {
     let trimmed = command.trim();
     matches!(trimmed.find(';'), Some(index) if index == trimmed.len() - 1)
+}
+
+fn auto_end_turn_if_ready<W: Write>(game: &mut Game, output: &mut W) -> io::Result<()> {
+    if game.status() != GameStatus::InProgress
+        || game.turn().remaining_actions() != 0
+        || has_possible_catastrophe(game.turn().state())
+    {
+        return Ok(());
+    }
+
+    match game.end_turn() {
+        Ok(next) => {
+            *game = next;
+            writeln!(output, "Turn ended.")?;
+        }
+        Err(error) => writeln!(output, "Error: {}", format_game_error(&error))?,
+    }
+
+    Ok(())
 }
 
 fn read_load_source(path: &Path) -> Result<LoadSource, LoadSourceError> {
@@ -583,7 +603,6 @@ gs
 bl rl
 rm
 b 0 gs
-e
 s
 q
 ",
@@ -593,6 +612,63 @@ q
         assert!(output.contains("Turn ended."));
         assert!(output.contains("Current player: Player 2"));
         assert!(output.contains("Remaining actions: 1"));
+        assert!(!output.contains("Error:"));
+    }
+
+    #[test]
+    fn paid_action_auto_ends_when_no_catastrophe_is_possible() {
+        let output = run_script(
+            "ys bm
+gs
+bl rl
+rm
+b 0 gs
+q
+",
+        );
+
+        assert!(output.contains("Action applied."));
+        assert!(output.contains("Turn ended."));
+        assert!(output.contains("Current player: Player 2"));
+        assert!(output.contains("Remaining actions: 1"));
+    }
+
+    #[test]
+    fn paid_action_does_not_auto_end_when_catastrophe_is_possible() {
+        let output = run_script(
+            "gs gm
+gl
+ys rm
+bl
+b 0 gs;
+q
+",
+        );
+
+        assert!(output.contains("Action applied."));
+        assert!(!output.contains("Turn ended."));
+        assert!(output.contains("Current player: Player 1"));
+        assert!(output.contains("Remaining actions: 0"));
+        assert!(output.contains("Stars: gs, gm"));
+        assert!(output.contains("Ships: P1 gl, P1 gs"));
+    }
+
+    #[test]
+    fn catastrophe_auto_ends_after_budget_is_spent_when_none_remain() {
+        let output = run_script(
+            "gs gm
+gl
+ys rm
+bl
+b 0 gs
+c 0 g
+q
+",
+        );
+
+        assert!(output.contains("Action applied."));
+        assert!(output.contains("Turn ended."));
+        assert!(output.contains("Status: finished, winner Player 2"));
     }
 
     #[test]
@@ -765,7 +841,6 @@ q
         fs::write(
             &path,
             "b 0 gs
-e
 show
 ",
         )
@@ -787,11 +862,11 @@ q
         assert!(output.contains("Running commands from "));
         assert!(output.contains("P1> b 0 gs"));
         assert!(output.contains("Action applied."));
-        assert!(output.contains("P1> e"));
         assert!(output.contains("Turn ended."));
         assert!(output.contains("P2> show"));
         assert!(output.contains("Current player: Player 2"));
         assert!(output.contains("Finished commands from "));
+        assert!(!output.contains("Error:"));
     }
 
     #[test]
@@ -799,12 +874,11 @@ q
         let path = temp_history_path("history_load_ignores_blank_lines_and_comments");
         fs::write(
             &path,
-            "# Build a ship, then pass the turn.
+            "# Build a ship, then the turn passes automatically.
 
 b 0 gs # use green power
 
 # Comments can occupy whole lines.
-e # end the turn
 show # inspect the resulting state
 ",
         )

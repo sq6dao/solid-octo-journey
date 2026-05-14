@@ -752,6 +752,20 @@ fn catastrophe_validation_rejects_an_unknown_system() {
 }
 
 #[test]
+fn possible_catastrophe_detection_accepts_four_same_color_pieces() {
+    let state = state_with_catastrophe_count(Color::Red, 4);
+
+    assert!(has_possible_catastrophe(&state));
+}
+
+#[test]
+fn possible_catastrophe_detection_rejects_three_same_color_pieces() {
+    let state = state_with_catastrophe_count(Color::Red, 3);
+
+    assert!(!has_possible_catastrophe(&state));
+}
+
+#[test]
 fn sacrifice_validation_accepts_an_owned_ship_present_at_the_system() {
     let state = valid_state();
     let sacrifice = Action::Sacrifice {

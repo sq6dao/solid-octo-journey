@@ -122,6 +122,11 @@ Inside a travel command, `x` means an existing target system:
 t 0 ys x 1
 ```
 
+When a paid action spends the last action and no catastrophe is possible,
+the CLI ends the turn automatically. If a catastrophe is possible, the
+turn stays with the current player at 0 actions so they can either run a
+`catastrophe` command or explicitly `end`.
+
 ## Semicolon Shortcut
 
 Append `;` as the final character of a command to print the game state
@@ -172,7 +177,6 @@ the end of the line, so `#`-only lines are also ignored:
 ```text
 # Opening turn
 b 0 gs
-e # pass to Player 2
 show
 ```
 
@@ -200,8 +204,7 @@ Player 2 stars> bl rl
 Player 2 ship> rm
 P1> show
 P1> b 0 gs;
-P1> v game.yaml
-P1> e
+P2> v game.yaml
 P2> q
 ```
 

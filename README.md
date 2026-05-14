@@ -52,6 +52,9 @@ c 1 r
 q
 ```
 
+When a paid action spends the last action and no catastrophe is possible,
+the CLI ends the turn automatically.
+
 Append `;` to a command to print the game state afterward, including
 after errors:
 
