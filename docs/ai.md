@@ -33,12 +33,27 @@ order.
 Strategy implementations use the same legal-decision stream:
 
 ```rust
-use hw_ai::{FirstLegalStrategy, Strategy};
+use hw_ai::{FirstLegalStrategy, PriorityStrategy, Strategy};
 use hw_engine::Game;
 
 let game = Game::default(hw_core::Player::One);
 let decision = FirstLegalStrategy.choose(&game);
+let stronger_decision = PriorityStrategy.choose(&game);
 ```
 
 `FirstLegalStrategy` returns the first generated legal decision, or
 `None` for terminal games and other positions with no legal decisions.
+
+`PriorityStrategy` is still deterministic, but it groups legal decisions
+before choosing. It prefers:
+
+1. Immediate wins for the current player
+2. Legal catastrophes
+3. Paid actions
+4. Legal turn end
+
+Tie-breaking within each group preserves `legal_decisions` order. An
+action is treated as an immediate win when applying it, then legally
+ending the turn if possible, produces `GameOutcome::Winner` for the
+current player. `EndTurn` is treated as an immediate win when ending the
+turn directly produces that outcome.

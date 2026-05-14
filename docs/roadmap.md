@@ -238,11 +238,11 @@ Initial action coverage:
 #### AI-2: Baseline Strategies
 
 - [x] Add `FirstLegalStrategy`
-- [ ] Add a simple deterministic priority strategy
-- [ ] Prefer immediate wins, then necessary catastrophes, then paid
+- [x] Add a simple deterministic priority strategy
+- [x] Prefer immediate wins, then necessary catastrophes, then paid
   actions, then legal turn end
-- [ ] Test deterministic tie-breaking
-- [ ] Test terminal-state handling
+- [x] Test deterministic tie-breaking
+- [x] Test terminal-state handling
 
 #### AI-3: Heuristic Evaluation
 
