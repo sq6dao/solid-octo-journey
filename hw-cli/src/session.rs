@@ -1,4 +1,8 @@
-use std::io::{self, BufRead, Write};
+use std::{
+    fmt, fs,
+    io::{self, BufRead, Write},
+    path::Path,
+};
 
 use hw_core::Player;
 use hw_engine::{Game, HomeworldSetup, save};
@@ -7,6 +11,8 @@ use crate::{
     parser::{ParsedCommand, parse_input, parse_setup},
     render::{render_game, render_help, render_turn_summary},
 };
+
+const MAX_LOAD_DEPTH: usize = 16;
 
 pub fn run_stdio() -> io::Result<()> {
     let stdin = io::stdin();
@@ -38,62 +44,164 @@ where
             break;
         }
 
-        let command = line.trim();
-        if command.is_empty() {
-            continue;
-        }
-
-        match parse_input(command, game.turn().current_player()) {
-            Ok(parsed) => match parsed.command {
-                ParsedCommand::Help => {
-                    write!(output, "{}", render_help())?;
-                    render_after_semicolon(parsed.show_after, &game, &mut output)?;
-                }
-                ParsedCommand::Show => write!(output, "{}", render_game(&game))?,
-                ParsedCommand::Quit => {
-                    writeln!(output, "Goodbye.")?;
-                    break;
-                }
-                ParsedCommand::Save(path) => match save::save_file(&game, &path) {
-                    Ok(()) => {
-                        writeln!(output, "Saved to {}.", path.display())?;
-                        render_after_semicolon(parsed.show_after, &game, &mut output)?;
-                    }
-                    Err(error) => writeln!(output, "Error: {error}")?,
-                },
-                ParsedCommand::Load(path) => match save::load_file(&path) {
-                    Ok(loaded) => {
-                        game = loaded;
-                        writeln!(output, "Loaded from {}.", path.display())?;
-                        write!(output, "{}", render_turn_summary(&game))?;
-                        render_after_semicolon(parsed.show_after, &game, &mut output)?;
-                    }
-                    Err(error) => writeln!(output, "Error: {error}")?,
-                },
-                ParsedCommand::End => match game.end_turn() {
-                    Ok(next) => {
-                        game = next;
-                        writeln!(output, "Turn ended.")?;
-                        write!(output, "{}", render_turn_summary(&game))?;
-                        render_after_semicolon(parsed.show_after, &game, &mut output)?;
-                    }
-                    Err(error) => writeln!(output, "Error: {}", format_game_error(&error))?,
-                },
-                ParsedCommand::Action(action) => match game.apply_action(&action) {
-                    Ok(next) => {
-                        game = next;
-                        writeln!(output, "Action applied.")?;
-                        write!(output, "{}", render_turn_summary(&game))?;
-                        render_after_semicolon(parsed.show_after, &game, &mut output)?;
-                    }
-                    Err(error) => writeln!(output, "Error: {}", format_game_error(&error))?,
-                },
-            },
-            Err(error) => writeln!(output, "Error: {}", error.message())?,
+        if run_command(line.trim(), &mut game, &mut output, 0)? == CommandOutcome::Quit {
+            break;
         }
     }
 
     Ok(())
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum CommandOutcome {
+    Continue,
+    Quit,
+}
+
+enum LoadSource {
+    Save(Game),
+    History(String),
+}
+
+#[derive(Debug)]
+enum LoadSourceError {
+    Io(io::Error),
+    Save(save::SaveError),
+}
+
+impl fmt::Display for LoadSourceError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Io(error) => write!(formatter, "I/O error: {error}"),
+            Self::Save(error) => error.fmt(formatter),
+        }
+    }
+}
+
+fn run_command<W: Write>(
+    command: &str,
+    game: &mut Game,
+    output: &mut W,
+    load_depth: usize,
+) -> io::Result<CommandOutcome> {
+    if command.is_empty() {
+        return Ok(CommandOutcome::Continue);
+    }
+
+    match parse_input(command, game.turn().current_player()) {
+        Ok(parsed) => match parsed.command {
+            ParsedCommand::Help => {
+                write!(output, "{}", render_help())?;
+                render_after_semicolon(parsed.show_after, game, output)?;
+                Ok(CommandOutcome::Continue)
+            }
+            ParsedCommand::Show => {
+                write!(output, "{}", render_game(game))?;
+                Ok(CommandOutcome::Continue)
+            }
+            ParsedCommand::Quit => {
+                writeln!(output, "Goodbye.")?;
+                Ok(CommandOutcome::Quit)
+            }
+            ParsedCommand::Save(path) => {
+                match save::save_file(game, &path) {
+                    Ok(()) => {
+                        writeln!(output, "Saved to {}.", path.display())?;
+                        render_after_semicolon(parsed.show_after, game, output)?;
+                    }
+                    Err(error) => writeln!(output, "Error: {error}")?,
+                }
+                Ok(CommandOutcome::Continue)
+            }
+            ParsedCommand::Load(path) => {
+                if load_depth >= MAX_LOAD_DEPTH {
+                    writeln!(output, "Error: load nesting limit exceeded")?;
+                    return Ok(CommandOutcome::Continue);
+                }
+
+                match read_load_source(&path) {
+                    Ok(LoadSource::Save(loaded)) => {
+                        *game = loaded;
+                        writeln!(output, "Loaded from {}.", path.display())?;
+                        write!(output, "{}", render_turn_summary(game))?;
+                        render_after_semicolon(parsed.show_after, game, output)?;
+                        Ok(CommandOutcome::Continue)
+                    }
+                    Ok(LoadSource::History(history)) => {
+                        writeln!(output, "Running commands from {}.", path.display())?;
+                        match run_history(&history, game, output, load_depth + 1)? {
+                            CommandOutcome::Continue => {
+                                writeln!(output, "Finished commands from {}.", path.display())?;
+                                render_after_semicolon(parsed.show_after, game, output)?;
+                                Ok(CommandOutcome::Continue)
+                            }
+                            CommandOutcome::Quit => Ok(CommandOutcome::Quit),
+                        }
+                    }
+                    Err(error) => {
+                        writeln!(output, "Error: {error}")?;
+                        Ok(CommandOutcome::Continue)
+                    }
+                }
+            }
+            ParsedCommand::End => {
+                match game.end_turn() {
+                    Ok(next) => {
+                        *game = next;
+                        writeln!(output, "Turn ended.")?;
+                        write!(output, "{}", render_turn_summary(game))?;
+                        render_after_semicolon(parsed.show_after, game, output)?;
+                    }
+                    Err(error) => writeln!(output, "Error: {}", format_game_error(&error))?,
+                }
+                Ok(CommandOutcome::Continue)
+            }
+            ParsedCommand::Action(action) => {
+                match game.apply_action(&action) {
+                    Ok(next) => {
+                        *game = next;
+                        writeln!(output, "Action applied.")?;
+                        write!(output, "{}", render_turn_summary(game))?;
+                        render_after_semicolon(parsed.show_after, game, output)?;
+                    }
+                    Err(error) => writeln!(output, "Error: {}", format_game_error(&error))?,
+                }
+                Ok(CommandOutcome::Continue)
+            }
+        },
+        Err(error) => {
+            writeln!(output, "Error: {}", error.message())?;
+            Ok(CommandOutcome::Continue)
+        }
+    }
+}
+
+fn read_load_source(path: &Path) -> Result<LoadSource, LoadSourceError> {
+    let input = fs::read_to_string(path).map_err(LoadSourceError::Io)?;
+    match save::from_yaml(&input) {
+        Ok(game) => Ok(LoadSource::Save(game)),
+        Err(error) if looks_like_yaml_save(&input) => Err(LoadSourceError::Save(error)),
+        Err(_) => Ok(LoadSource::History(input)),
+    }
+}
+
+fn looks_like_yaml_save(input: &str) -> bool {
+    input.lines().any(|line| line.trim_start() == "version: 1")
+}
+
+fn run_history<W: Write>(
+    history: &str,
+    game: &mut Game,
+    output: &mut W,
+    load_depth: usize,
+) -> io::Result<CommandOutcome> {
+    for command in history.lines() {
+        if run_command(command.trim(), game, output, load_depth)? == CommandOutcome::Quit {
+            return Ok(CommandOutcome::Quit);
+        }
+    }
+
+    Ok(CommandOutcome::Continue)
 }
 
 fn render_after_semicolon<W: Write>(
@@ -412,6 +520,92 @@ q
     }
 
     #[test]
+    fn load_command_replays_command_history_file() {
+        let path = temp_history_path("load_command_replays_command_history_file");
+        fs::write(
+            &path,
+            "b 0 gs
+e
+show
+",
+        )
+        .expect("history fixture writes");
+        let script = format!(
+            "ys bm
+gs
+bl rl
+rm
+l {}
+q
+",
+            path.display()
+        );
+
+        let output = run_script(&script);
+        let _ = fs::remove_file(path);
+
+        assert!(output.contains("Running commands from "));
+        assert!(output.contains("Action applied."));
+        assert!(output.contains("Turn ended."));
+        assert!(output.contains("Current player: Player 2"));
+        assert!(output.contains("Finished commands from "));
+    }
+
+    #[test]
+    fn history_load_supports_semicolon_state_printing() {
+        let path = temp_history_path("history_load_supports_semicolon_state_printing");
+        fs::write(
+            &path, "b 0 gs;
+",
+        )
+        .expect("history fixture writes");
+        let script = format!(
+            "ys bm
+gs
+bl rl
+rm
+l {}
+q
+",
+            path.display()
+        );
+
+        let output = run_script(&script);
+        let _ = fs::remove_file(path);
+
+        assert!(output.contains("Action applied."));
+        assert!(output.contains("Status: in progress"));
+        assert!(output.contains("Ships: P1 gs, P1 gs"));
+    }
+
+    #[test]
+    fn history_load_quit_exits_the_session() {
+        let path = temp_history_path("history_load_quit_exits_the_session");
+        fs::write(
+            &path, "q
+",
+        )
+        .expect("history fixture writes");
+        let script = format!(
+            "ys bm
+gs
+bl rl
+rm
+l {}
+show
+",
+            path.display()
+        );
+
+        let output = run_script(&script);
+        let _ = fs::remove_file(path);
+
+        assert!(output.contains("Running commands from "));
+        assert!(output.contains("Goodbye."));
+        assert!(!output.contains("Status: in progress"));
+    }
+
+    #[test]
     fn failed_load_keeps_the_current_game() {
         let path = temp_save_path("failed_load_keeps_the_current_game");
         let script = format!(
@@ -433,6 +627,38 @@ q
         assert!(output.contains("Remaining actions: 1"));
     }
 
+    #[test]
+    fn malformed_yaml_save_is_not_replayed_as_history() {
+        let path = temp_save_path("malformed_yaml_save_is_not_replayed_as_history");
+        fs::write(
+            &path,
+            "version: 1
+players:
+  - p1
+",
+        )
+        .expect("save fixture writes");
+        let script = format!(
+            "ys bm
+gs
+bl rl
+rm
+l {}
+show
+q
+",
+            path.display()
+        );
+
+        let output = run_script(&script);
+        let _ = fs::remove_file(path);
+
+        assert!(output.contains("Error:"));
+        assert!(!output.contains("Running commands from "));
+        assert!(output.contains("Current player: Player 1"));
+        assert!(output.contains("Remaining actions: 1"));
+    }
+
     fn run_script(input: &str) -> String {
         let mut output = Vec::new();
         run(Cursor::new(input), &mut output).expect("script runs");
@@ -441,5 +667,9 @@ q
 
     fn temp_save_path(name: &str) -> PathBuf {
         std::env::temp_dir().join(format!("homeworlds-rs-{name}-{}.yaml", std::process::id()))
+    }
+
+    fn temp_history_path(name: &str) -> PathBuf {
+        std::env::temp_dir().join(format!("homeworlds-rs-{name}-{}.txt", std::process::id()))
     }
 }

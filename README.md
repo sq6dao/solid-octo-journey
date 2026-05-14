@@ -39,6 +39,7 @@ show
 b 0 gs
 v game.yaml
 l game.yaml
+l scenario.txt
 end
 s
 x 0 bs rs
@@ -52,6 +53,7 @@ Append `;` to a successful command to print the game state afterward:
 b 0 gs;
 ```
 
-Save files use hand-editable YAML. See [docs/cli.md](docs/cli.md) for
-the full command reference and [docs/save-format.md](docs/save-format.md)
-for the save format.
+Save files use hand-editable YAML. The same `load` command can also
+replay a plain text command history file with one CLI command per line.
+See [docs/cli.md](docs/cli.md) for the full command reference and
+[docs/save-format.md](docs/save-format.md) for the save format.

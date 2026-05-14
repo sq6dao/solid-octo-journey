@@ -71,7 +71,7 @@ pub const fn render_help() -> &'static str {
   end | e
   quit | q
   save | v <path>
-  load | l <path>
+  load | l <path>  (YAML save or command history)
   build | b <system> <piece>
   travel | t <from> <piece> existing | x <to>
   travel | t <from> <piece> new | n <star> [<star>]

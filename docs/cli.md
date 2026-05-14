@@ -127,7 +127,7 @@ show; q  # rejected
 
 Use `save <path>` or `v <path>` to write a YAML save file. Use
 `load <path>` or `l <path>` to replace the current game with a saved
-game.
+game or replay a command history file.
 
 ```text
 v game.yaml
@@ -141,6 +141,31 @@ the current game unchanged. Paths are single command tokens, so spaces in
 paths are not supported by the v1 text parser.
 
 See [save-format.md](save-format.md) for the YAML v1 schema.
+
+## Command History Files
+
+`load <path>` also accepts plain text command history files. Each
+non-empty line is parsed as the same CLI command you would type at the
+prompt:
+
+```text
+b 0 gs
+e
+show
+```
+
+The commands run against the current game state. Errors are printed just
+like typed commands and later lines continue to run. A `quit` or `q`
+command in the history exits the session. Semicolon state printing works
+inside history files and after the outer load command:
+
+```text
+b 0 gs;
+```
+
+If a file parses as a YAML save, it is loaded as a save. If it looks like
+a v1 YAML save but is invalid, the CLI reports the save error instead of
+replaying it as history.
 
 ## Sample Session
 
