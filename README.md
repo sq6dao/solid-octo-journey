@@ -34,6 +34,11 @@ cargo run -p hw-cli
 In an interactive terminal, use the arrow keys to browse current-session
 history and edit the current line before pressing Enter.
 
+Press Tab at the end of an exact short command to expand it to the full
+command word, such as `b` to `build`, `x` to `trade`, or `sh` to
+`save-history`. Ambiguous `s`, partial command names, and lines
+containing `;` are left unchanged.
+
 Interactive history is session-only. It includes setup lines and typed
 commands, but not commands replayed from files and not `save-history` /
 `sh` itself.

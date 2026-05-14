@@ -6,7 +6,15 @@ use std::{
 
 use hw_core::Player;
 use hw_engine::{Game, GameStatus, HomeworldSetup, has_possible_catastrophe, save};
-use rustyline::{DefaultEditor, error::ReadlineError};
+use rustyline::{
+    Context, Editor, Helper,
+    completion::{Completer, Pair},
+    error::ReadlineError,
+    highlight::Highlighter,
+    hint::Hinter,
+    history::DefaultHistory,
+    validate::Validator,
+};
 
 use crate::{
     parser::{ParsedCommand, parse_input, parse_setup},
@@ -77,13 +85,87 @@ impl<R: BufRead> LineInput for ScriptedLineInput<R> {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+struct CliHelper;
+
+impl Completer for CliHelper {
+    type Candidate = Pair;
+
+    fn complete(
+        &self,
+        line: &str,
+        pos: usize,
+        _ctx: &Context<'_>,
+    ) -> rustyline::Result<(usize, Vec<Self::Candidate>)> {
+        let Some((start, replacement)) = command_completion(line, pos) else {
+            return Ok((0, Vec::new()));
+        };
+
+        Ok((
+            start,
+            vec![Pair {
+                display: replacement.to_owned(),
+                replacement: replacement.to_owned(),
+            }],
+        ))
+    }
+}
+
+impl Helper for CliHelper {}
+impl Highlighter for CliHelper {}
+impl Hinter for CliHelper {
+    type Hint = String;
+}
+impl Validator for CliHelper {}
+
+fn command_completion(line: &str, pos: usize) -> Option<(usize, &'static str)> {
+    if line.contains(';') {
+        return None;
+    }
+
+    let token_start = line
+        .char_indices()
+        .find_map(|(index, ch)| (!ch.is_whitespace()).then_some(index))?;
+    let token_end = line[token_start..]
+        .char_indices()
+        .find_map(|(offset, ch)| ch.is_whitespace().then_some(token_start + offset))
+        .unwrap_or(line.len());
+
+    if pos != token_end {
+        return None;
+    }
+
+    let token = &line[token_start..token_end];
+    exact_command_expansion(token).map(|replacement| (token_start, replacement))
+}
+
+fn exact_command_expansion(token: &str) -> Option<&'static str> {
+    match token.to_ascii_lowercase().as_str() {
+        "h" => Some("help"),
+        "e" => Some("end"),
+        "q" => Some("quit"),
+        "v" => Some("save"),
+        "sh" => Some("save-history"),
+        "l" => Some("load"),
+        "b" => Some("build"),
+        "t" => Some("travel"),
+        "tr" | "x" => Some("trade"),
+        "sac" => Some("sacrifice"),
+        "i" => Some("invade"),
+        "c" => Some("catastrophe"),
+        _ => None,
+    }
+}
+
 struct RustylineInput {
-    editor: DefaultEditor,
+    editor: Editor<CliHelper, DefaultHistory>,
 }
 
 impl RustylineInput {
     fn new() -> io::Result<Self> {
-        let editor = DefaultEditor::new().map_err(readline_error_to_io)?;
+        let mut editor =
+            Editor::<CliHelper, DefaultHistory>::new().map_err(readline_error_to_io)?;
+        editor.set_helper(Some(CliHelper));
         Ok(Self { editor })
     }
 }
@@ -827,6 +909,51 @@ mod tests {
         assert!(!should_record_user_history("save-history game.yaml"));
         assert!(!should_record_user_history("sh game.yaml"));
         assert!(!should_record_user_history("SH game.yaml"));
+    }
+
+    #[test]
+    fn tab_completion_expands_exact_command_shorthands() {
+        for (input, expected) in [
+            ("h", "help"),
+            ("e", "end"),
+            ("q", "quit"),
+            ("v", "save"),
+            ("sh", "save-history"),
+            ("l", "load"),
+            ("b", "build"),
+            ("t", "travel"),
+            ("tr", "trade"),
+            ("x", "trade"),
+            ("sac", "sacrifice"),
+            ("i", "invade"),
+            ("c", "catastrophe"),
+            ("B", "build"),
+        ] {
+            assert_eq!(
+                command_completion(input, input.len()),
+                Some((0, expected)),
+                "{input} should complete to {expected}"
+            );
+        }
+    }
+
+    #[test]
+    fn tab_completion_preserves_text_after_first_token() {
+        assert_eq!(command_completion("b 0 gs", 1), Some((0, "build")));
+        assert_eq!(command_completion("  b 0 gs", 3), Some((2, "build")));
+    }
+
+    #[test]
+    fn tab_completion_ignores_ambiguous_partials_arguments_and_semicolons() {
+        for input in [
+            "", "   ", "s", "show", "build", "save", "bu", "sa", "sav", "cat", "save-h", "b;",
+            "b 0 gs;",
+        ] {
+            assert_eq!(command_completion(input, input.len()), None, "{input}");
+        }
+
+        assert_eq!(command_completion("b ", 2), None);
+        assert_eq!(command_completion("b 0 gs", "b 0 gs".len()), None);
     }
 
     #[test]

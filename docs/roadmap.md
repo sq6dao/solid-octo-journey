@@ -162,6 +162,10 @@ Minimal playable interface
 - [x] Text-based rendering
 - [x] Input validation
 - [x] Turn feedback
+- [x] Interactive arrow-key history and line editing
+- [x] Tab-expand exact command shorthands
+- [ ] Tab-expand partial command names such as `bu`, `sa`, and `save-h`
+- [ ] Tab-expand command arguments such as system IDs, pieces, and paths
 
 ---
 

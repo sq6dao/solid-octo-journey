@@ -18,6 +18,23 @@ editing and arrow-key history. Up/down browse setup lines and commands
 typed in the current run. Replayed commands are not added to this
 history, and history does not persist after the CLI exits.
 
+Press Tab at the end of an exact short command to expand it to the full
+command word:
+
+```text
+b   -> build
+t   -> travel
+tr  -> trade
+x   -> trade
+sh  -> save-history
+sac -> sacrifice
+```
+
+Expansion applies only to the first command word in an interactive
+terminal. It preserves any arguments already typed after that word.
+Ambiguous `s`, partial names such as `bu` or `save-h`, and lines
+containing `;` are left unchanged.
+
 ## Homeworld Setup
 
 At startup, each player enters exactly two stars and one starting ship.
