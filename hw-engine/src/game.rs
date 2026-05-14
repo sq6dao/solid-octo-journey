@@ -111,11 +111,13 @@ impl Game {
 
     pub fn end_turn(&self) -> Result<Self, GameError> {
         self.ensure_in_progress()?;
+        let turn = self.turn.end_turn()?;
+        let status = match game_outcome(turn.state()) {
+            Some(outcome) => GameStatus::Finished(outcome),
+            None => GameStatus::InProgress,
+        };
 
-        Ok(Self {
-            turn: self.turn.end_turn()?,
-            status: self.status,
-        })
+        Ok(Self { turn, status })
     }
 
     fn ensure_in_progress(&self) -> Result<(), GameError> {
@@ -154,6 +156,25 @@ fn draw_setup_piece(bank: &mut Bank, piece: Piece) -> Result<(), GameError> {
         .map_err(|_| GameError::PieceUnavailable { piece })
 }
 
+fn game_outcome(state: &GameState) -> Option<GameOutcome> {
+    match (
+        player_has_lost(state, Player::One),
+        player_has_lost(state, Player::Two),
+    ) {
+        (false, false) => None,
+        (true, false) => Some(GameOutcome::Winner(Player::Two)),
+        (false, true) => Some(GameOutcome::Winner(Player::One)),
+        (true, true) => Some(GameOutcome::Draw),
+    }
+}
+
+fn player_has_lost(state: &GameState, player: Player) -> bool {
+    state
+        .system(state.homeworld(player))
+        .map(|homeworld| !homeworld.has_presence(player))
+        .unwrap_or(true)
+}
+
 impl From<GameStateError> for GameError {
     fn from(error: GameStateError) -> Self {
         Self::InvalidState(error)
@@ -168,7 +189,7 @@ impl From<TurnError> for GameError {
 
 #[cfg(test)]
 mod tests {
-    use hw_core::{Color, Size, SystemId};
+    use hw_core::{Color, Size, StarSystem, SystemId};
 
     use super::*;
 
@@ -303,5 +324,204 @@ mod tests {
         assert_eq!(game.turn().state().systems().len(), 2);
         assert_eq!(game.turn().state().homeworld(Player::One), SystemId::new(0));
         assert_eq!(game.turn().state().homeworld(Player::Two), SystemId::new(1));
+    }
+
+    #[test]
+    fn applying_an_action_delegates_to_turn_state() {
+        let game = Game::default(Player::One);
+        let ship = Piece::owned(Color::Green, Size::Small, Player::One);
+        let action = build_action(Player::One, ship);
+
+        let next = game.apply_action(&action).expect("action applies");
+
+        assert_eq!(next.status(), GameStatus::InProgress);
+        assert_eq!(next.turn().current_player(), Player::One);
+        assert_eq!(next.turn().remaining_actions(), 0);
+        assert_eq!(
+            count_ship(
+                next.turn()
+                    .state()
+                    .system(SystemId::new(0))
+                    .expect("system exists"),
+                ship,
+            ),
+            2
+        );
+    }
+
+    #[test]
+    fn ending_a_turn_without_a_loss_switches_players() {
+        let game = Game::default(Player::One);
+        let action = build_action(
+            Player::One,
+            Piece::owned(Color::Green, Size::Small, Player::One),
+        );
+        let spent = game.apply_action(&action).expect("action applies");
+
+        let next = spent.end_turn().expect("turn ends");
+
+        assert_eq!(next.status(), GameStatus::InProgress);
+        assert_eq!(next.turn().current_player(), Player::Two);
+        assert_eq!(next.turn().remaining_actions(), 1);
+    }
+
+    #[test]
+    fn loss_is_detected_only_when_ending_a_turn() {
+        let game = game_with_state(state_with_lost_player_two(), Player::One);
+        let action = build_action(
+            Player::One,
+            Piece::owned(Color::Green, Size::Small, Player::One),
+        );
+
+        let spent = game.apply_action(&action).expect("action applies");
+
+        assert_eq!(spent.status(), GameStatus::InProgress);
+        assert_eq!(
+            spent.end_turn().expect("turn ends").status(),
+            GameStatus::Finished(GameOutcome::Winner(Player::One))
+        );
+    }
+
+    #[test]
+    fn terminal_games_reject_actions_and_turn_ending() {
+        let game = game_with_state(state_with_lost_player_two(), Player::One);
+        let action = build_action(
+            Player::One,
+            Piece::owned(Color::Green, Size::Small, Player::One),
+        );
+        let finished = game
+            .apply_action(&action)
+            .expect("action applies")
+            .end_turn()
+            .expect("turn ends");
+        let outcome = GameOutcome::Winner(Player::One);
+
+        assert_eq!(
+            finished.apply_action(&action),
+            Err(GameError::Terminal { outcome })
+        );
+        assert_eq!(finished.end_turn(), Err(GameError::Terminal { outcome }));
+    }
+
+    #[test]
+    fn both_players_lost_at_turn_end_is_a_draw() {
+        let game = game_with_state(state_with_both_players_lost(), Player::One);
+        let action = build_action_at(
+            Player::One,
+            SystemId::new(1),
+            Piece::owned(Color::Green, Size::Small, Player::One),
+        );
+
+        let finished = game
+            .apply_action(&action)
+            .expect("action applies")
+            .end_turn()
+            .expect("turn ends");
+
+        assert_eq!(finished.status(), GameStatus::Finished(GameOutcome::Draw));
+    }
+
+    #[test]
+    fn unresolved_catastrophes_do_not_block_game_turn_ending() {
+        let game = game_with_state(state_with_pending_catastrophe(), Player::One);
+        let action = build_action(
+            Player::One,
+            Piece::owned(Color::Green, Size::Small, Player::One),
+        );
+        let spent = game.apply_action(&action).expect("action applies");
+
+        let next = spent.end_turn().expect("turn ends");
+
+        assert_eq!(next.status(), GameStatus::InProgress);
+        assert_eq!(next.turn().current_player(), Player::Two);
+    }
+
+    fn game_with_state(state: GameState, current_player: Player) -> Game {
+        Game {
+            turn: TurnState::new(state, current_player),
+            status: GameStatus::InProgress,
+        }
+    }
+
+    fn build_action(player: Player, ship: Piece) -> Action {
+        build_action_at(player, SystemId::new(0), ship)
+    }
+
+    fn build_action_at(player: Player, system: SystemId, ship: Piece) -> Action {
+        Action::Build {
+            player,
+            system,
+            ship,
+        }
+    }
+
+    fn state_with_lost_player_two() -> GameState {
+        GameState::new(
+            vec![
+                StarSystem::new(
+                    vec![Piece::new(Color::Yellow, Size::Small)],
+                    vec![Piece::owned(Color::Green, Size::Small, Player::One)],
+                )
+                .expect("system is valid"),
+                StarSystem::new(vec![Piece::new(Color::Blue, Size::Large)], vec![])
+                    .expect("system is valid"),
+            ],
+            [SystemId::new(0), SystemId::new(1)],
+            Bank::new(),
+        )
+        .expect("state is valid")
+    }
+
+    fn state_with_both_players_lost() -> GameState {
+        GameState::new(
+            vec![
+                StarSystem::new(vec![Piece::new(Color::Yellow, Size::Small)], vec![])
+                    .expect("system is valid"),
+                StarSystem::new(
+                    vec![Piece::new(Color::Blue, Size::Large)],
+                    vec![Piece::owned(Color::Green, Size::Small, Player::One)],
+                )
+                .expect("system is valid"),
+            ],
+            [SystemId::new(0), SystemId::new(1)],
+            Bank::new(),
+        )
+        .expect("state is valid")
+    }
+
+    fn state_with_pending_catastrophe() -> GameState {
+        GameState::new(
+            vec![
+                StarSystem::new(
+                    vec![
+                        Piece::new(Color::Red, Size::Small),
+                        Piece::new(Color::Blue, Size::Medium),
+                    ],
+                    vec![
+                        Piece::owned(Color::Red, Size::Small, Player::One),
+                        Piece::owned(Color::Red, Size::Medium, Player::One),
+                        Piece::owned(Color::Red, Size::Large, Player::Two),
+                        Piece::owned(Color::Green, Size::Small, Player::One),
+                    ],
+                )
+                .expect("system is valid"),
+                StarSystem::new(
+                    vec![Piece::new(Color::Yellow, Size::Large)],
+                    vec![Piece::owned(Color::Yellow, Size::Small, Player::Two)],
+                )
+                .expect("system is valid"),
+            ],
+            [SystemId::new(0), SystemId::new(1)],
+            Bank::new(),
+        )
+        .expect("state is valid")
+    }
+
+    fn count_ship(system: &StarSystem, ship: Piece) -> usize {
+        system
+            .ships()
+            .iter()
+            .filter(|candidate| **candidate == ship)
+            .count()
     }
 }
