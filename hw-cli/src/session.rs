@@ -405,7 +405,6 @@ fn should_record_user_history(line: &str) -> bool {
 
 fn is_save_history_command(command: &str) -> bool {
     command
-        .trim()
         .split_whitespace()
         .next()
         .is_some_and(|token| matches!(token.to_ascii_lowercase().as_str(), "save-history" | "sh"))
@@ -589,8 +588,8 @@ fn parse_setup_load(line: &str) -> Option<Result<(PathBuf, bool), crate::parser:
     }
 
     Some(
-        parse_input(line, Player::One).and_then(|parsed| match parsed.command {
-            ParsedCommand::Load(path) => Ok((path, parsed.show_after)),
+        parse_input(line, Player::One).map(|parsed| match parsed.command {
+            ParsedCommand::Load(path) => (path, parsed.show_after),
             _ => unreachable!("load command prefix parsed as a non-load command"),
         }),
     )
