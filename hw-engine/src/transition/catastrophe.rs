@@ -42,10 +42,7 @@ fn remove_color(
     Ok(kept)
 }
 
-fn return_pieces(
-    bank: &mut hw_core::Bank,
-    pieces: Vec<Piece>,
-) -> Result<(), TransitionError> {
+fn return_pieces(bank: &mut hw_core::Bank, pieces: Vec<Piece>) -> Result<(), TransitionError> {
     for piece in pieces {
         shared::return_piece(bank, piece)?;
     }

@@ -1,12 +1,10 @@
 mod build;
 mod catastrophe;
 mod invade;
-// `move` is a Rust keyword; use a raw identifier so the file can still
-// match the action name.
-mod r#move;
 mod sacrifice;
 mod shared;
 mod trade;
+mod travel;
 
 use hw_core::{Color, GameState, Piece, Player, Size, StarSystemError, SystemId};
 
@@ -75,12 +73,12 @@ pub fn validate_action(state: &GameState, action: &Action) -> Result<(), ActionE
             system,
             ship,
         } => build::validate(state, *player, *system, *ship),
-        Action::Move {
+        Action::Travel {
             player,
             from,
             ship,
             target,
-        } => r#move::validate(state, *player, *from, *ship, target),
+        } => travel::validate(state, *player, *from, *ship, target),
         Action::Trade {
             player,
             system,

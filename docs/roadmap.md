@@ -28,14 +28,14 @@
   construction still allows empty homeworld states, while engine game
   flow detects homeworld loss at turn end.
 - `hw-engine` currently defines typed actions and non-mutating validation
-  for Build, Move, Trade, Sacrifice, Invade, and Catastrophe. Move
+  for Build, Travel, Trade, Sacrifice, Invade, and Catastrophe. Travel
   targets can be existing systems or newly discovered systems. Discovery
   validation requires requested stars to be available in the bank, and
-  Move rejects target systems that share a star size with the source.
+  Travel rejects target systems that share a star size with the source.
   Invade requires a same-size-or-larger acting-player ship in the target
   system.
 - `hw-engine` exposes pure `apply_action` state transitions for Build,
-  Move, Trade, Invade, Sacrifice, and Catastrophe. It also provides
+  Travel, Trade, Invade, Sacrifice, and Catastrophe. It also provides
   `TurnState` for turn sequencing and `Game` for initialization,
   turn-end win detection, and terminal-state enforcement.
 - `hw-cli` is still a placeholder.
@@ -93,16 +93,16 @@ Encode all legal moves and transitions.
 #### 1. Actions
 - [x] Enum:
   - [x] Build
-  - [x] Move (existing or new system target)
+  - [x] Travel (existing or new system target)
   - [x] Trade
   - [x] Sacrifice
   - [x] Invade
   - [x] Catastrophe
 
 #### 2. Action Validation
-- [x] Non-mutating validation for Build, Move, Trade, Sacrifice,
+- [x] Non-mutating validation for Build, Travel, Trade, Sacrifice,
   Invade, and Catastrophe
-- [x] Invalid move → Result::Err
+- [x] Invalid action → Result::Err
 - [x] Full rule validation
 
 #### 3. Turn System
@@ -114,7 +114,7 @@ Encode all legal moves and transitions.
 - [x] Pure functions: `GameState -> Action -> GameState`
 - [x] No side effects
 - [x] Build
-- [x] Move
+- [x] Travel
 - [x] Trade
 - [x] Invade
 - [x] Sacrifice

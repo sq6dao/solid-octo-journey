@@ -7,11 +7,11 @@ pub enum Action {
         system: SystemId,
         ship: Piece,
     },
-    Move {
+    Travel {
         player: Player,
         from: SystemId,
         ship: Piece,
-        target: MoveTarget,
+        target: TravelTarget,
     },
     Trade {
         player: Player,
@@ -39,7 +39,7 @@ impl Action {
     pub const fn kind(&self) -> ActionKind {
         match self {
             Self::Build { .. } => ActionKind::Build,
-            Self::Move { .. } => ActionKind::Move,
+            Self::Travel { .. } => ActionKind::Travel,
             Self::Trade { .. } => ActionKind::Trade,
             Self::Sacrifice { .. } => ActionKind::Sacrifice,
             Self::Invade { .. } => ActionKind::Invade,
@@ -49,7 +49,7 @@ impl Action {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum MoveTarget {
+pub enum TravelTarget {
     Existing(SystemId),
     New { stars: Vec<Piece> },
 }
@@ -57,7 +57,7 @@ pub enum MoveTarget {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ActionKind {
     Build,
-    Move,
+    Travel,
     Trade,
     Sacrifice,
     Invade,

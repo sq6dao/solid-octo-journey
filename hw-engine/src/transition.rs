@@ -1,12 +1,10 @@
 mod build;
 mod catastrophe;
 mod invade;
-// `move` is a Rust keyword; use a raw identifier so the file can still
-// match the action name.
-mod r#move;
 mod sacrifice;
 mod shared;
 mod trade;
+mod travel;
 
 use hw_core::{GameState, GameStateError, StarSystemError};
 
@@ -28,12 +26,12 @@ pub fn apply_action(state: &GameState, action: &Action) -> Result<GameState, Tra
             system,
             ship,
         } => build::apply(state, *player, *system, *ship),
-        Action::Move {
+        Action::Travel {
             player,
             from,
             ship,
             target,
-        } => r#move::apply(state, *player, *from, *ship, target),
+        } => travel::apply(state, *player, *from, *ship, target),
         Action::Trade {
             player,
             system,

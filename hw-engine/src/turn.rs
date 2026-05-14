@@ -13,9 +13,14 @@ pub struct TurnState {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TurnError {
     InvalidAction(TransitionError),
-    WrongPlayer { expected: Player, actual: Player },
+    WrongPlayer {
+        expected: Player,
+        actual: Player,
+    },
     NoActionBudget,
-    ActionsRemaining { remaining: usize },
+    ActionsRemaining {
+        remaining: usize,
+    },
     WrongSacrificeActionKind {
         expected: ActionKind,
         actual: ActionKind,
@@ -46,7 +51,8 @@ impl TurnState {
 
     pub fn apply_action(&self, action: &Action) -> Result<Self, TurnError> {
         if matches!(action, Action::Catastrophe { .. }) {
-            let state = crate::apply_action(&self.state, action).map_err(TurnError::InvalidAction)?;
+            let state =
+                crate::apply_action(&self.state, action).map_err(TurnError::InvalidAction)?;
 
             return Ok(Self {
                 state,
@@ -120,7 +126,7 @@ impl TurnState {
 fn action_player(action: &Action) -> Option<Player> {
     match action {
         Action::Build { player, .. }
-        | Action::Move { player, .. }
+        | Action::Travel { player, .. }
         | Action::Trade { player, .. }
         | Action::Sacrifice { player, .. }
         | Action::Invade { player, .. } => Some(*player),
@@ -146,7 +152,7 @@ const fn sacrifice_budget(size: Size) -> usize {
 const fn sacrifice_action_kind(color: Color) -> ActionKind {
     match color {
         Color::Green => ActionKind::Build,
-        Color::Yellow => ActionKind::Move,
+        Color::Yellow => ActionKind::Travel,
         Color::Blue => ActionKind::Trade,
         Color::Red => ActionKind::Invade,
     }
@@ -157,7 +163,7 @@ mod tests {
     use hw_core::{Bank, Color, GameState, Piece, Player, Size, StarSystem, SystemId};
 
     use super::*;
-    use crate::{Action, ActionError, MoveTarget, TransitionError};
+    use crate::{Action, ActionError, TransitionError, TravelTarget};
 
     #[test]
     fn turn_state_tracks_the_current_player_and_state() {
@@ -181,7 +187,12 @@ mod tests {
         assert_eq!(next.current_player(), Player::One);
         assert_eq!(next.remaining_actions(), 0);
         assert_eq!(
-            count_ship(next.state().system(SystemId::new(0)).expect("system exists"), ship),
+            count_ship(
+                next.state()
+                    .system(SystemId::new(0))
+                    .expect("system exists"),
+                ship
+            ),
             2
         );
     }
@@ -458,11 +469,11 @@ mod tests {
             Player::One,
             owned_ship(Player::One, Color::Green, Size::Small),
         );
-        let next_player_move = Action::Move {
+        let next_player_travel = Action::Travel {
             player: Player::Two,
             from: SystemId::new(1),
             ship: owned_ship(Player::Two, Color::Yellow, Size::Small),
-            target: MoveTarget::Existing(SystemId::new(0)),
+            target: TravelTarget::Existing(SystemId::new(0)),
         };
         let spent = turn
             .apply_action(&sacrifice)
@@ -471,12 +482,12 @@ mod tests {
             .expect("build applies");
 
         let next_turn = spent.end_turn().expect("turn ends");
-        let moved = next_turn
-            .apply_action(&next_player_move)
-            .expect("move applies");
+        let traveled = next_turn
+            .apply_action(&next_player_travel)
+            .expect("travel applies");
 
-        assert_eq!(moved.current_player(), Player::Two);
-        assert_eq!(moved.remaining_actions(), 0);
+        assert_eq!(traveled.current_player(), Player::Two);
+        assert_eq!(traveled.remaining_actions(), 0);
     }
 
     fn build_action(player: Player, ship: Piece) -> Action {

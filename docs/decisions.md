@@ -210,7 +210,7 @@ refer to systems.
 **Decision**
 Represent engine actions as a typed enum in `hw-engine`:
 - Build
-- Move with a target of an existing or new system
+- Travel with a target of an existing or new system
 - Trade
 - Sacrifice
 - Invade
@@ -266,7 +266,7 @@ pure state-transition support.
 Validate action powers by requiring the acting player to have the matching
 color ship at the relevant system:
 - Green for Build
-- Yellow for Move
+- Yellow for Travel
 - Blue for Trade
 - Red for Invade
 
@@ -290,10 +290,10 @@ budgets, ownership changes, and state transitions are still deferred.
 
 ---
 
-## 2026-05-12 – Move Target Unification
+## 2026-05-12 – Travel Target Unification
 
 **Decision**
-Model discovery as a move to a new system. `Action::Move` now carries a
+Model discovery as travel to a new system. `Action::Travel` carries a
 target that is either an existing `SystemId` or a new system described by
 unowned star pieces.
 
@@ -303,15 +303,15 @@ new system as yellow actions. Keeping them under one action variant makes
 the engine action model match that rule more directly.
 
 **Alternatives**
-- Keep separate Move and Discover action variants
-- Use optional destination fields on Move
+- Keep separate Travel and Discover action variants
+- Use optional destination fields on Travel
 - Delay the merge until state-transition APIs exist
 
 **Consequences**
 + Existing-system movement and discovery share one validation path
 + Callers no longer need a separate Discover action shape
-- Existing callers must migrate to `MoveTarget::Existing` or
-  `MoveTarget::New`
+- Existing callers must migrate to `TravelTarget::Existing` or
+  `TravelTarget::New`
 
 ---
 
@@ -367,9 +367,8 @@ state-transition support exists.
 ## 2026-05-12 – Action Validation Module Layout
 
 **Decision**
-Keep one validation module per action under `hw-engine`. The Move
-validation module is stored in `move.rs` and declared as `mod r#move`
-because `move` is a Rust keyword.
+Keep one validation module per action under `hw-engine`. The Travel
+validation module is stored in `travel.rs` and declared as `mod travel`.
 
 **Context**
 Action validation had grown into one large file. Splitting by action keeps
@@ -378,12 +377,11 @@ names.
 
 **Alternatives**
 - Keep all validation in one file
-- Use `move_action.rs` to avoid the raw identifier
+- Use longer file names like `travel_action.rs`
 
 **Consequences**
 + Validation files now align with action names
-+ The raw identifier is documented at the module declaration
-- Readers need to recognize Rust raw identifier syntax
+- Action modules avoid Rust keyword overlap
 
 ---
 
@@ -413,12 +411,12 @@ size ordering so same-or-larger invasion checks are deterministic.
 ## 2026-05-12 – Discovery Star Bank Validation
 
 **Decision**
-Validate `MoveTarget::New` discovery stars against the bank, including
+Validate `TravelTarget::New` discovery stars against the bank, including
 duplicate color/size requests.
 
 **Context**
 Discovery consumes stars from the bank once transitions exist. Validating
-availability before transitions keeps invalid moves from reaching state
+availability before transitions keeps invalid actions from reaching state
 mutation code.
 
 **Alternatives**
@@ -428,19 +426,19 @@ mutation code.
 **Consequences**
 + Discovery legality now accounts for bank exhaustion
 + Transition code can rely on discovery stars being drawable
-- Move validation needs to count duplicate requested stars
+- Travel validation needs to count duplicate requested stars
 
 ---
 
-## 2026-05-12 – Move Star Size Validation
+## 2026-05-12 – Travel Star Size Validation
 
 **Decision**
-Reject Move actions when the source system and target system share any
+Reject Travel actions when the source system and target system share any
 star size. This applies to existing-system targets and new discovery
 targets.
 
 **Context**
-Homeworlds systems are identified by star sizes. A ship cannot move or
+Homeworlds systems are identified by star sizes. A ship cannot travel or
 discover between systems that overlap in star size.
 
 **Alternatives**
@@ -448,9 +446,9 @@ discover between systems that overlap in star size.
 - Defer size conflicts to transition execution
 
 **Consequences**
-+ Invalid Move actions fail before transition execution
++ Invalid Travel actions fail before transition execution
 + Discovery uses the same star-size rule as existing-system movement
-- Move validation now depends on target star details
+- Travel validation now depends on target star details
 
 ---
 
@@ -499,15 +497,15 @@ returns a new `GameState`.
 
 ---
 
-## 2026-05-12 – Move Execution and Pruning
+## 2026-05-12 – Travel Execution and Pruning
 
 **Decision**
-Implement Move transitions for existing-system targets and new discovery
+Implement Travel transitions for existing-system targets and new discovery
 targets. Prune non-homeworld systems that have no ships after movement,
 returning remaining pieces to the bank and compacting system IDs.
 
 **Context**
-Move is the first transition that can remove a ship from one system and
+Travel is the first transition that can remove a ship from one system and
 therefore needs engine-level cleanup. Homeworld systems remain in the
 state even when their last ship leaves.
 
@@ -517,7 +515,7 @@ state even when their last ship leaves.
 - Delay discovery execution until a later transition pass
 
 **Consequences**
-+ Move produces game states without empty non-homeworld systems
++ Travel produces game states without empty non-homeworld systems
 + Discovery consumes stars from the bank during transition execution
 - Callers must use the returned state after ID compaction
 
@@ -687,6 +685,32 @@ handles action budgets and player switching.
 + Core remains a reusable board-state model
 + Loss timing is explicit and testable at turn boundaries
 - The CLI still needs separate command parsing and rendering
+
+---
+
+## 2026-05-14 – Travel Naming
+
+**Decision**
+Rename the yellow movement action to Travel across public API,
+module names, tests, and documentation.
+
+`Action::Travel`, `TravelTarget`, and `ActionKind::Travel` replace the
+old movement-action names. The validation and transition modules are named
+`travel.rs`.
+
+**Context**
+The previous name forced raw-identifier module declarations
+because `move` is a Rust keyword. Travel avoids that overlap while still
+describing movement to existing systems and discovery of new systems.
+
+**Alternatives**
+- Keep the old public name and use raw identifiers internally
+- Add partial compatibility aliases
+
+**Consequences**
++ The action API and module names no longer overlap Rust keywords
++ File names line up directly with action names
+- Existing callers must migrate to the Travel names
 
 ---
 

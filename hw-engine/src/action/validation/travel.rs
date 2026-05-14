@@ -1,6 +1,6 @@
 use hw_core::{Color, GameState, Piece, Player, Size, StarSystem, SystemId};
 
-use crate::action::MoveTarget;
+use crate::action::TravelTarget;
 
 use super::{ActionError, shared};
 
@@ -9,13 +9,13 @@ pub(super) fn validate(
     player: Player,
     from: SystemId,
     ship: Piece,
-    target: &MoveTarget,
+    target: &TravelTarget,
 ) -> Result<(), ActionError> {
     let source_system = state
         .system(from)
         .ok_or(ActionError::UnknownSystem { system: from })?;
 
-    if let MoveTarget::Existing(to) = target {
+    if let TravelTarget::Existing(to) = target {
         shared::require_system(state, *to)?;
 
         if from == *to {
@@ -28,13 +28,13 @@ pub(super) fn validate(
     shared::require_action_power(state, player, from, Color::Yellow)?;
 
     match target {
-        MoveTarget::Existing(to) => {
+        TravelTarget::Existing(to) => {
             let target_system = state
                 .system(*to)
                 .ok_or(ActionError::UnknownSystem { system: *to })?;
             require_distinct_star_sizes(source_system.stars(), target_system.stars())?;
         }
-        MoveTarget::New { stars } => {
+        TravelTarget::New { stars } => {
             StarSystem::new(stars.to_vec(), vec![ship])
                 .map(|_| ())
                 .map_err(|error| ActionError::InvalidDiscovery { error })?;

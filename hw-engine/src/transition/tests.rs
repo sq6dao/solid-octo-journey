@@ -1,6 +1,6 @@
 use hw_core::{Bank, Color, GameState, Piece, Player, Size, StarSystem, SystemId};
 
-use crate::{Action, ActionError, MoveTarget, TransitionError, apply_action};
+use crate::{Action, ActionError, TransitionError, TravelTarget, apply_action};
 
 #[test]
 fn apply_build_action_adds_the_ship_and_draws_from_the_bank() {
@@ -47,14 +47,14 @@ fn apply_build_action_returns_validation_errors() {
 }
 
 #[test]
-fn apply_move_action_moves_a_ship_between_existing_systems() {
+fn apply_travel_action_sends_a_ship_between_existing_systems() {
     let state = valid_state();
     let ship = owned_ship(Player::One, Color::Blue, Size::Small);
-    let action = Action::Move {
+    let action = Action::Travel {
         player: Player::One,
         from: SystemId::new(0),
         ship,
-        target: MoveTarget::Existing(SystemId::new(1)),
+        target: TravelTarget::Existing(SystemId::new(1)),
     };
 
     let next = apply_action(&state, &action).expect("action applies");
@@ -74,15 +74,15 @@ fn apply_move_action_moves_a_ship_between_existing_systems() {
 }
 
 #[test]
-fn apply_move_action_discovers_a_new_system_and_draws_stars() {
+fn apply_travel_action_discovers_a_new_system_and_draws_stars() {
     let state = valid_state();
     let ship = owned_ship(Player::One, Color::Blue, Size::Small);
     let star = Piece::new(Color::Red, Size::Medium);
-    let action = Action::Move {
+    let action = Action::Travel {
         player: Player::One,
         from: SystemId::new(0),
         ship,
-        target: MoveTarget::New { stars: vec![star] },
+        target: TravelTarget::New { stars: vec![star] },
     };
 
     let next = apply_action(&state, &action).expect("action applies");
@@ -98,7 +98,7 @@ fn apply_move_action_discovers_a_new_system_and_draws_stars() {
 }
 
 #[test]
-fn apply_move_action_prunes_an_empty_non_homeworld_source() {
+fn apply_travel_action_prunes_an_empty_non_homeworld_source() {
     let source_star = Piece::new(Color::Blue, Size::Medium);
     let ship = owned_ship(Player::One, Color::Yellow, Size::Small);
     let state = state_with_systems_and_homeworlds(
@@ -118,11 +118,11 @@ fn apply_move_action_prunes_an_empty_non_homeworld_source() {
         ],
         [SystemId::new(0), SystemId::new(2)],
     );
-    let action = Action::Move {
+    let action = Action::Travel {
         player: Player::One,
         from: SystemId::new(1),
         ship,
-        target: MoveTarget::Existing(SystemId::new(0)),
+        target: TravelTarget::Existing(SystemId::new(0)),
     };
 
     let next = apply_action(&state, &action).expect("action applies");
@@ -140,7 +140,7 @@ fn apply_move_action_prunes_an_empty_non_homeworld_source() {
 }
 
 #[test]
-fn apply_move_action_keeps_an_empty_homeworld_source() {
+fn apply_travel_action_keeps_an_empty_homeworld_source() {
     let ship = owned_ship(Player::One, Color::Yellow, Size::Small);
     let state = state_with_systems_and_homeworlds(
         Bank::new(),
@@ -155,11 +155,11 @@ fn apply_move_action_keeps_an_empty_homeworld_source() {
         ],
         [SystemId::new(0), SystemId::new(1)],
     );
-    let action = Action::Move {
+    let action = Action::Travel {
         player: Player::One,
         from: SystemId::new(0),
         ship,
-        target: MoveTarget::Existing(SystemId::new(1)),
+        target: TravelTarget::Existing(SystemId::new(1)),
     };
 
     let next = apply_action(&state, &action).expect("action applies");

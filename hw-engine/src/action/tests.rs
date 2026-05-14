@@ -8,14 +8,14 @@ fn actions_report_their_kind() {
         ActionKind::Build
     );
     assert_eq!(
-        Action::Move {
+        Action::Travel {
             player: Player::One,
             from: SystemId::new(0),
             ship: owned_ship(Player::One, Color::Blue, Size::Small),
-            target: MoveTarget::Existing(SystemId::new(1)),
+            target: TravelTarget::Existing(SystemId::new(1)),
         }
         .kind(),
-        ActionKind::Move
+        ActionKind::Travel
     );
     assert_eq!(
         Action::Trade {
@@ -28,16 +28,16 @@ fn actions_report_their_kind() {
         ActionKind::Trade
     );
     assert_eq!(
-        Action::Move {
+        Action::Travel {
             player: Player::One,
             from: SystemId::new(0),
             ship: owned_ship(Player::One, Color::Blue, Size::Small),
-            target: MoveTarget::New {
+            target: TravelTarget::New {
                 stars: vec![Piece::new(Color::Yellow, Size::Small)],
             },
         }
         .kind(),
-        ActionKind::Move
+        ActionKind::Travel
     );
     assert_eq!(
         Action::Sacrifice {
@@ -198,9 +198,9 @@ fn build_validation_accepts_large_after_smaller_pieces_are_exhausted() {
 }
 
 #[test]
-fn move_validation_accepts_a_well_formed_action() {
+fn travel_validation_accepts_a_well_formed_action() {
     let state = valid_state();
-    let action = move_action(
+    let action = travel_action(
         Player::One,
         SystemId::new(0),
         SystemId::new(1),
@@ -212,9 +212,9 @@ fn move_validation_accepts_a_well_formed_action() {
 }
 
 #[test]
-fn move_validation_rejects_unknown_systems() {
+fn travel_validation_rejects_unknown_systems() {
     let state = valid_state();
-    let action = move_action(
+    let action = travel_action(
         Player::One,
         SystemId::new(0),
         SystemId::new(2),
@@ -231,9 +231,9 @@ fn move_validation_rejects_unknown_systems() {
 }
 
 #[test]
-fn move_validation_rejects_the_same_source_and_destination() {
+fn travel_validation_rejects_the_same_source_and_destination() {
     let state = valid_state();
-    let action = move_action(
+    let action = travel_action(
         Player::One,
         SystemId::new(0),
         SystemId::new(0),
@@ -250,14 +250,14 @@ fn move_validation_rejects_the_same_source_and_destination() {
 }
 
 #[test]
-fn move_validation_rejects_the_wrong_owner() {
+fn travel_validation_rejects_the_wrong_owner() {
     let state = valid_state();
     let ship = owned_ship(Player::Two, Color::Blue, Size::Small);
-    let action = Action::Move {
+    let action = Action::Travel {
         player: Player::One,
         from: SystemId::new(0),
         ship,
-        target: MoveTarget::Existing(SystemId::new(1)),
+        target: TravelTarget::Existing(SystemId::new(1)),
     };
 
     assert_eq!(
@@ -270,14 +270,14 @@ fn move_validation_rejects_the_wrong_owner() {
 }
 
 #[test]
-fn move_validation_rejects_a_missing_source_ship() {
+fn travel_validation_rejects_a_missing_source_ship() {
     let state = valid_state();
     let ship = owned_ship(Player::One, Color::Green, Size::Large);
-    let action = Action::Move {
+    let action = Action::Travel {
         player: Player::One,
         from: SystemId::new(0),
         ship,
-        target: MoveTarget::Existing(SystemId::new(1)),
+        target: TravelTarget::Existing(SystemId::new(1)),
     };
 
     assert_eq!(
@@ -290,12 +290,12 @@ fn move_validation_rejects_a_missing_source_ship() {
 }
 
 #[test]
-fn move_validation_rejects_missing_yellow_power() {
+fn travel_validation_rejects_missing_yellow_power() {
     let state = state_with_primary_ships(vec![
         owned_ship(Player::One, Color::Blue, Size::Small),
         owned_ship(Player::One, Color::Green, Size::Small),
     ]);
-    let action = move_action(
+    let action = travel_action(
         Player::One,
         SystemId::new(0),
         SystemId::new(1),
@@ -426,13 +426,13 @@ fn trade_validation_rejects_missing_blue_power() {
 }
 
 #[test]
-fn move_validation_accepts_a_new_system_target() {
+fn travel_validation_accepts_a_new_system_target() {
     let state = valid_state();
-    let action = Action::Move {
+    let action = Action::Travel {
         player: Player::One,
         from: SystemId::new(0),
         ship: owned_ship(Player::One, Color::Blue, Size::Small),
-        target: MoveTarget::New {
+        target: TravelTarget::New {
             stars: vec![Piece::new(Color::Red, Size::Medium)],
         },
     };
@@ -441,7 +441,7 @@ fn move_validation_accepts_a_new_system_target() {
 }
 
 #[test]
-fn move_validation_rejects_existing_target_with_a_shared_star_size() {
+fn travel_validation_rejects_existing_target_with_a_shared_star_size() {
     let state = state_with_bank_and_systems(
         Bank::new(),
         vec![
@@ -460,7 +460,7 @@ fn move_validation_rejects_existing_target_with_a_shared_star_size() {
             .expect("system is valid"),
         ],
     );
-    let action = move_action(
+    let action = travel_action(
         Player::One,
         SystemId::new(0),
         SystemId::new(1),
@@ -475,13 +475,13 @@ fn move_validation_rejects_existing_target_with_a_shared_star_size() {
 }
 
 #[test]
-fn move_validation_rejects_new_target_with_a_shared_star_size() {
+fn travel_validation_rejects_new_target_with_a_shared_star_size() {
     let state = valid_state();
-    let action = Action::Move {
+    let action = Action::Travel {
         player: Player::One,
         from: SystemId::new(0),
         ship: owned_ship(Player::One, Color::Blue, Size::Small),
-        target: MoveTarget::New {
+        target: TravelTarget::New {
             stars: vec![Piece::new(Color::Red, Size::Small)],
         },
     };
@@ -493,13 +493,13 @@ fn move_validation_rejects_new_target_with_a_shared_star_size() {
 }
 
 #[test]
-fn move_validation_rejects_invalid_new_system_stars() {
+fn travel_validation_rejects_invalid_new_system_stars() {
     let state = valid_state();
-    let action = Action::Move {
+    let action = Action::Travel {
         player: Player::One,
         from: SystemId::new(0),
         ship: owned_ship(Player::One, Color::Blue, Size::Small),
-        target: MoveTarget::New {
+        target: TravelTarget::New {
             stars: vec![Piece::owned(Color::Yellow, Size::Small, Player::One)],
         },
     };
@@ -513,14 +513,14 @@ fn move_validation_rejects_invalid_new_system_stars() {
 }
 
 #[test]
-fn move_validation_rejects_an_unavailable_discovery_star() {
+fn travel_validation_rejects_an_unavailable_discovery_star() {
     let state = state_with_empty_bank_piece(Color::Red, Size::Large);
     let star = Piece::new(Color::Red, Size::Large);
-    let action = Action::Move {
+    let action = Action::Travel {
         player: Player::One,
         from: SystemId::new(0),
         ship: owned_ship(Player::One, Color::Blue, Size::Small),
-        target: MoveTarget::New { stars: vec![star] },
+        target: TravelTarget::New { stars: vec![star] },
     };
 
     assert_eq!(
@@ -530,17 +530,17 @@ fn move_validation_rejects_an_unavailable_discovery_star() {
 }
 
 #[test]
-fn move_validation_rejects_duplicate_discovery_stars_exceeding_the_bank() {
+fn travel_validation_rejects_duplicate_discovery_stars_exceeding_the_bank() {
     let mut bank = Bank::new();
     bank.draw(Color::Red, Size::Large).expect("piece exists");
     bank.draw(Color::Red, Size::Large).expect("piece exists");
     let state = state_with_bank(bank);
     let star = Piece::new(Color::Red, Size::Large);
-    let action = Action::Move {
+    let action = Action::Travel {
         player: Player::One,
         from: SystemId::new(0),
         ship: owned_ship(Player::One, Color::Blue, Size::Small),
-        target: MoveTarget::New {
+        target: TravelTarget::New {
             stars: vec![star, star],
         },
     };
@@ -552,16 +552,16 @@ fn move_validation_rejects_duplicate_discovery_stars_exceeding_the_bank() {
 }
 
 #[test]
-fn move_validation_rejects_missing_yellow_power_for_a_new_system_target() {
+fn travel_validation_rejects_missing_yellow_power_for_a_new_system_target() {
     let state = state_with_primary_ships(vec![
         owned_ship(Player::One, Color::Blue, Size::Small),
         owned_ship(Player::One, Color::Green, Size::Small),
     ]);
-    let action = Action::Move {
+    let action = Action::Travel {
         player: Player::One,
         from: SystemId::new(0),
         ship: owned_ship(Player::One, Color::Blue, Size::Small),
-        target: MoveTarget::New {
+        target: TravelTarget::New {
             stars: vec![Piece::new(Color::Yellow, Size::Small)],
         },
     };
@@ -577,14 +577,14 @@ fn move_validation_rejects_missing_yellow_power_for_a_new_system_target() {
 }
 
 #[test]
-fn move_validation_rejects_a_missing_source_ship_for_a_new_system_target() {
+fn travel_validation_rejects_a_missing_source_ship_for_a_new_system_target() {
     let state = valid_state();
     let ship = owned_ship(Player::One, Color::Green, Size::Large);
-    let action = Action::Move {
+    let action = Action::Travel {
         player: Player::One,
         from: SystemId::new(0),
         ship,
-        target: MoveTarget::New {
+        target: TravelTarget::New {
             stars: vec![Piece::new(Color::Yellow, Size::Small)],
         },
     };
@@ -599,14 +599,14 @@ fn move_validation_rejects_a_missing_source_ship_for_a_new_system_target() {
 }
 
 #[test]
-fn move_validation_rejects_the_wrong_owner_for_a_new_system_target() {
+fn travel_validation_rejects_the_wrong_owner_for_a_new_system_target() {
     let state = valid_state();
     let ship = owned_ship(Player::Two, Color::Blue, Size::Small);
-    let action = Action::Move {
+    let action = Action::Travel {
         player: Player::One,
         from: SystemId::new(0),
         ship,
-        target: MoveTarget::New {
+        target: TravelTarget::New {
             stars: vec![Piece::new(Color::Yellow, Size::Small)],
         },
     };
@@ -928,12 +928,12 @@ fn build_action(player: Player, system: SystemId, color: Color, size: Size) -> A
     }
 }
 
-fn move_action(player: Player, from: SystemId, to: SystemId, color: Color, size: Size) -> Action {
-    Action::Move {
+fn travel_action(player: Player, from: SystemId, to: SystemId, color: Color, size: Size) -> Action {
+    Action::Travel {
         player,
         from,
         ship: owned_ship(player, color, size),
-        target: MoveTarget::Existing(to),
+        target: TravelTarget::Existing(to),
     }
 }
 

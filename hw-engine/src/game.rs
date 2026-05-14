@@ -213,19 +213,31 @@ mod tests {
         assert_eq!(state.homeworld(Player::One), SystemId::new(0));
         assert_eq!(state.homeworld(Player::Two), SystemId::new(1));
         assert_eq!(
-            state.system(SystemId::new(0)).expect("system exists").stars(),
+            state
+                .system(SystemId::new(0))
+                .expect("system exists")
+                .stars(),
             &[Piece::new(Color::Yellow, Size::Small)]
         );
         assert_eq!(
-            state.system(SystemId::new(0)).expect("system exists").ships(),
+            state
+                .system(SystemId::new(0))
+                .expect("system exists")
+                .ships(),
             &[one_ship]
         );
         assert_eq!(
-            state.system(SystemId::new(1)).expect("system exists").stars(),
+            state
+                .system(SystemId::new(1))
+                .expect("system exists")
+                .stars(),
             &[Piece::new(Color::Blue, Size::Large)]
         );
         assert_eq!(
-            state.system(SystemId::new(1)).expect("system exists").ships(),
+            state
+                .system(SystemId::new(1))
+                .expect("system exists")
+                .ships(),
             &[two_ship]
         );
         assert_eq!(

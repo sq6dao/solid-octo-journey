@@ -1,6 +1,6 @@
 use hw_core::{GameState, Piece, Player, StarSystem, SystemId};
 
-use crate::action::MoveTarget;
+use crate::action::TravelTarget;
 
 use super::{TransitionError, shared};
 
@@ -9,11 +9,11 @@ pub(super) fn apply(
     _player: Player,
     from: SystemId,
     ship: Piece,
-    target: &MoveTarget,
+    target: &TravelTarget,
 ) -> Result<GameState, TransitionError> {
     match target {
-        MoveTarget::Existing(to) => apply_existing(state, from, ship, *to),
-        MoveTarget::New { stars } => apply_new(state, from, ship, stars),
+        TravelTarget::Existing(to) => apply_existing(state, from, ship, *to),
+        TravelTarget::New { stars } => apply_new(state, from, ship, stars),
     }
 }
 
