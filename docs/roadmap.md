@@ -38,7 +38,9 @@
   Travel, Trade, Invade, Sacrifice, and Catastrophe. It also provides
   `TurnState` for turn sequencing and `Game` for initialization,
   turn-end win detection, and terminal-state enforcement.
-- `hw-cli` is still a placeholder.
+- `hw-cli` provides a text hot-seat interface with setup prompts,
+  command parsing, state rendering, turn feedback, and the semicolon
+  state-display shortcut. See `docs/cli.md` for command details.
 - The workspace test suite currently covers core piece, bank, and star
   system invariants, `GameState` container behavior, and initial action
   validation.
