@@ -165,7 +165,7 @@ Minimal playable interface
 - [x] Interactive arrow-key history and line editing
 - [x] Tab-expand exact command shorthands
 - [x] Tab-expand partial command names such as `bu` and `save-h`
-- [ ] Tab-expand command arguments such as system IDs, pieces, and paths
+- [x] Tab-expand command arguments such as system IDs, pieces, and paths
 
 ---
 

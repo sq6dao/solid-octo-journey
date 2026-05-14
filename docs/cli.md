@@ -37,6 +37,12 @@ terminal. It preserves any arguments already typed after that word.
 Ambiguous partials such as `s` or `sa`, and lines containing `;`, are
 left unchanged.
 
+After a recognized command word, Tab suggests parser-level arguments:
+current system IDs, visible compact pieces, travel target words
+(`existing`, `new`, `x`, `n`), catastrophe colors, and file paths for
+`save`, `save-history`, and `load`. These suggestions are syntax-aware
+but do not prove that an action is legal in the current position.
+
 ## Homeworld Setup
 
 At startup, each player enters exactly two stars and one starting ship.

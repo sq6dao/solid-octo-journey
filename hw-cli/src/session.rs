@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use hw_core::Player;
+use hw_core::{Color, Piece, Player, Size};
 use hw_engine::{Game, GameStatus, HomeworldSetup, has_possible_catastrophe, save};
 use rustyline::{
     Context, Editor, Helper,
@@ -52,6 +52,8 @@ const COMMAND_ALIASES: &[(&str, &str)] = &[
     ("i", "invade"),
     ("c", "catastrophe"),
 ];
+const TRAVEL_TARGET_WORDS: &[&str] = &["existing", "new", "x", "n"];
+const COLOR_WORDS: &[&str] = &["red", "yellow", "green", "blue", "r", "y", "g", "b"];
 
 struct PromptedGame {
     game: Game,
@@ -67,6 +69,30 @@ struct LoadedHistory {
 
 type TypedHistory = Vec<String>;
 
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+struct CompletionSnapshot {
+    system_ids: Vec<String>,
+    pieces: Vec<String>,
+}
+
+impl CompletionSnapshot {
+    fn from_game(game: &Game) -> Self {
+        let state = game.turn().state();
+        let system_ids = (0..state.systems().len())
+            .map(|index| index.to_string())
+            .collect();
+        let mut pieces = Vec::new();
+
+        for system in state.systems() {
+            for piece in system.stars().iter().chain(system.ships()) {
+                push_piece_completion(&mut pieces, *piece);
+            }
+        }
+
+        Self { system_ids, pieces }
+    }
+}
+
 enum PromptLine {
     Eof,
     Interrupted,
@@ -81,6 +107,8 @@ trait LineInput {
     ) -> io::Result<PromptLine>;
 
     fn add_history_entry(&mut self, line: &str) -> io::Result<()>;
+
+    fn set_completion_snapshot(&mut self, _snapshot: CompletionSnapshot) {}
 }
 
 struct ScriptedLineInput<R> {
@@ -115,8 +143,16 @@ impl<R: BufRead> LineInput for ScriptedLineInput<R> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default)]
-struct CliHelper;
+#[derive(Clone, Debug, Default)]
+struct CliHelper {
+    snapshot: CompletionSnapshot,
+}
+
+impl CliHelper {
+    fn set_completion_snapshot(&mut self, snapshot: CompletionSnapshot) {
+        self.snapshot = snapshot;
+    }
+}
 
 impl Completer for CliHelper {
     type Candidate = Pair;
@@ -127,16 +163,19 @@ impl Completer for CliHelper {
         pos: usize,
         _ctx: &Context<'_>,
     ) -> rustyline::Result<(usize, Vec<Self::Candidate>)> {
-        let Some((start, replacement)) = command_completion(line, pos) else {
+        let Some((start, replacements)) = completion_candidates(line, pos, &self.snapshot) else {
             return Ok((0, Vec::new()));
         };
 
         Ok((
             start,
-            vec![Pair {
-                display: replacement.to_owned(),
-                replacement: replacement.to_owned(),
-            }],
+            replacements
+                .into_iter()
+                .map(|replacement| Pair {
+                    display: replacement.clone(),
+                    replacement,
+                })
+                .collect(),
         ))
     }
 }
@@ -147,6 +186,22 @@ impl Hinter for CliHelper {
     type Hint = String;
 }
 impl Validator for CliHelper {}
+
+fn completion_candidates(
+    line: &str,
+    pos: usize,
+    snapshot: &CompletionSnapshot,
+) -> Option<(usize, Vec<String>)> {
+    if line.contains(';') {
+        return None;
+    }
+
+    if let Some((start, replacement)) = command_completion(line, pos) {
+        return Some((start, vec![replacement.to_owned()]));
+    }
+
+    argument_completion(line, pos, snapshot)
+}
 
 fn command_completion(line: &str, pos: usize) -> Option<(usize, &'static str)> {
     if line.contains(';') {
@@ -205,6 +260,221 @@ fn command_word_completion(token: &str) -> Option<&'static str> {
     matched
 }
 
+fn argument_completion(
+    line: &str,
+    pos: usize,
+    snapshot: &CompletionSnapshot,
+) -> Option<(usize, Vec<String>)> {
+    if pos != line.len() || !line.is_char_boundary(pos) {
+        return None;
+    }
+
+    let ends_with_space = line.chars().last().is_some_and(char::is_whitespace);
+    let tokens = line.split_whitespace().collect::<Vec<_>>();
+    if tokens.is_empty() || (!ends_with_space && tokens.len() == 1) {
+        return None;
+    }
+
+    let has_args = tokens.len() > 1 || ends_with_space;
+    let command = canonical_command(tokens[0], has_args)?;
+    let current = if ends_with_space {
+        ""
+    } else {
+        tokens.last().copied()?
+    };
+    let start = if ends_with_space {
+        pos
+    } else {
+        pos - current.len()
+    };
+    let arg_index = if ends_with_space {
+        tokens.len() - 1
+    } else {
+        tokens.len() - 2
+    };
+
+    let candidates = argument_candidates(command, arg_index, &tokens, current, snapshot)?;
+    (!candidates.is_empty()).then_some((start, candidates))
+}
+
+fn canonical_command(token: &str, has_args: bool) -> Option<&'static str> {
+    let token = token.to_ascii_lowercase();
+
+    if token == "s" && has_args {
+        return Some("sacrifice");
+    }
+
+    if let Some(command) = COMMAND_NAMES
+        .iter()
+        .copied()
+        .find(|command| *command == token.as_str())
+    {
+        return Some(command);
+    }
+
+    if let Some((_, target)) = COMMAND_ALIASES
+        .iter()
+        .find(|(alias, _)| *alias == token.as_str())
+    {
+        return Some(*target);
+    }
+
+    command_word_completion(&token)
+}
+
+fn argument_candidates(
+    command: &str,
+    arg_index: usize,
+    tokens: &[&str],
+    current: &str,
+    snapshot: &CompletionSnapshot,
+) -> Option<Vec<String>> {
+    match command {
+        "save" | "save-history" | "load" if arg_index == 0 => Some(path_candidates(current)),
+        "build" | "sacrifice" => match arg_index {
+            0 => Some(word_candidates(current, &snapshot.system_ids)),
+            1 => Some(word_candidates(current, &snapshot.pieces)),
+            _ => None,
+        },
+        "trade" => match arg_index {
+            0 => Some(word_candidates(current, &snapshot.system_ids)),
+            1 | 2 => Some(word_candidates(current, &snapshot.pieces)),
+            _ => None,
+        },
+        "travel" => match arg_index {
+            0 => Some(word_candidates(current, &snapshot.system_ids)),
+            1 => Some(word_candidates(current, &snapshot.pieces)),
+            2 => Some(static_word_candidates(current, TRAVEL_TARGET_WORDS)),
+            3 => match tokens.get(3).map(|token| token.to_ascii_lowercase()) {
+                Some(target) if matches!(target.as_str(), "existing" | "x") => {
+                    Some(word_candidates(current, &snapshot.system_ids))
+                }
+                Some(target) if matches!(target.as_str(), "new" | "n") => {
+                    Some(word_candidates(current, &snapshot.pieces))
+                }
+                _ => None,
+            },
+            4 => match tokens.get(3).map(|token| token.to_ascii_lowercase()) {
+                Some(target) if matches!(target.as_str(), "new" | "n") => {
+                    Some(word_candidates(current, &snapshot.pieces))
+                }
+                _ => None,
+            },
+            _ => None,
+        },
+        "invade" => match arg_index {
+            0 => Some(word_candidates(current, &snapshot.system_ids)),
+            1 => Some(word_candidates(current, &snapshot.pieces)),
+            _ => None,
+        },
+        "catastrophe" => match arg_index {
+            0 => Some(word_candidates(current, &snapshot.system_ids)),
+            1 => Some(static_word_candidates(current, COLOR_WORDS)),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+fn word_candidates(current: &str, candidates: &[String]) -> Vec<String> {
+    let current = current.to_ascii_lowercase();
+    candidates
+        .iter()
+        .filter(|candidate| {
+            let candidate_lower = candidate.to_ascii_lowercase();
+            candidate_lower.starts_with(&current) && candidate_lower != current
+        })
+        .cloned()
+        .collect()
+}
+
+fn static_word_candidates(current: &str, candidates: &[&str]) -> Vec<String> {
+    let current = current.to_ascii_lowercase();
+    candidates
+        .iter()
+        .copied()
+        .filter(|candidate| candidate.starts_with(&current) && *candidate != current)
+        .map(str::to_owned)
+        .collect()
+}
+
+fn path_candidates(current: &str) -> Vec<String> {
+    let path = Path::new(current);
+    let (directory, prefix) = if current.ends_with(std::path::MAIN_SEPARATOR) {
+        (path, "")
+    } else {
+        (
+            path.parent().unwrap_or_else(|| Path::new("")),
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or(""),
+        )
+    };
+    let read_directory = if directory.as_os_str().is_empty() {
+        Path::new(".")
+    } else {
+        directory
+    };
+
+    let Ok(entries) = fs::read_dir(read_directory) else {
+        return Vec::new();
+    };
+    let mut candidates = entries
+        .filter_map(Result::ok)
+        .filter_map(|entry| {
+            let name = entry.file_name();
+            let name = name.to_str()?;
+            if !name.starts_with(prefix) {
+                return None;
+            }
+
+            let path = if directory.as_os_str().is_empty() {
+                PathBuf::from(name)
+            } else {
+                directory.join(name)
+            };
+            let mut replacement = path.display().to_string();
+            if replacement == current || replacement.chars().any(char::is_whitespace) {
+                return None;
+            }
+            if entry.file_type().ok()?.is_dir() {
+                replacement.push(std::path::MAIN_SEPARATOR);
+            }
+            Some(replacement)
+        })
+        .collect::<Vec<_>>();
+    candidates.sort();
+    candidates
+}
+
+fn push_piece_completion(pieces: &mut Vec<String>, piece: Piece) {
+    let token = compact_piece(piece);
+    if !pieces.contains(&token) {
+        pieces.push(token);
+    }
+}
+
+fn compact_piece(piece: Piece) -> String {
+    format!("{}{}", color_short(piece.color()), size_short(piece.size()))
+}
+
+fn color_short(color: Color) -> char {
+    match color {
+        Color::Red => 'r',
+        Color::Yellow => 'y',
+        Color::Green => 'g',
+        Color::Blue => 'b',
+    }
+}
+
+fn size_short(size: Size) -> char {
+    match size {
+        Size::Small => 's',
+        Size::Medium => 'm',
+        Size::Large => 'l',
+    }
+}
+
 struct RustylineInput {
     editor: Editor<CliHelper, DefaultHistory>,
 }
@@ -213,7 +483,7 @@ impl RustylineInput {
     fn new() -> io::Result<Self> {
         let mut editor =
             Editor::<CliHelper, DefaultHistory>::new().map_err(readline_error_to_io)?;
-        editor.set_helper(Some(CliHelper));
+        editor.set_helper(Some(CliHelper::default()));
         Ok(Self { editor })
     }
 }
@@ -239,6 +509,12 @@ impl LineInput for RustylineInput {
             .add_history_entry(line.to_owned())
             .map(|_| ())
             .map_err(readline_error_to_io)
+    }
+
+    fn set_completion_snapshot(&mut self, snapshot: CompletionSnapshot) {
+        if let Some(helper) = self.editor.helper_mut() {
+            helper.set_completion_snapshot(snapshot);
+        }
     }
 }
 
@@ -306,6 +582,7 @@ where
 
     loop {
         let prompt = format!("{}> ", prompt_label(game.turn().current_player()));
+        input.set_completion_snapshot(CompletionSnapshot::from_game(&game));
         let Some(line) = read_prompted_line(input, &prompt, &mut output)? else {
             break;
         };
@@ -1023,6 +1300,79 @@ mod tests {
 
         assert_eq!(command_completion("b ", 2), None);
         assert_eq!(command_completion("b 0 gs", "b 0 gs".len()), None);
+    }
+
+    #[test]
+    fn tab_completion_suggests_system_ids_for_system_arguments() {
+        let snapshot = CompletionSnapshot::from_game(&Game::default(Player::One));
+
+        assert_eq!(
+            completion_candidates("b ", 2, &snapshot),
+            Some((2, vec!["0".to_owned(), "1".to_owned()]))
+        );
+        assert_eq!(
+            completion_candidates("s ", 2, &snapshot),
+            Some((2, vec!["0".to_owned(), "1".to_owned()]))
+        );
+    }
+
+    #[test]
+    fn tab_completion_suggests_visible_piece_arguments() {
+        let snapshot = CompletionSnapshot::from_game(&Game::default(Player::One));
+
+        assert_eq!(
+            completion_candidates("b 0 g", 5, &snapshot),
+            Some((4, vec!["gs".to_owned()]))
+        );
+        assert_eq!(
+            completion_candidates("i 1 r", 5, &snapshot),
+            Some((4, vec!["rs".to_owned(), "rm".to_owned()]))
+        );
+    }
+
+    #[test]
+    fn tab_completion_suggests_travel_target_words_and_catastrophe_colors() {
+        let snapshot = CompletionSnapshot::from_game(&Game::default(Player::One));
+
+        assert_eq!(
+            completion_candidates("t 0 gs ", 7, &snapshot),
+            Some((
+                7,
+                vec![
+                    "existing".to_owned(),
+                    "new".to_owned(),
+                    "x".to_owned(),
+                    "n".to_owned(),
+                ],
+            ))
+        );
+        assert_eq!(
+            completion_candidates("t 0 gs e", 8, &snapshot),
+            Some((7, vec!["existing".to_owned()]))
+        );
+        assert_eq!(
+            completion_candidates("c 0 r", 5, &snapshot),
+            Some((4, vec!["red".to_owned()]))
+        );
+    }
+
+    #[test]
+    fn tab_completion_suggests_paths_for_file_arguments() {
+        let temp_dir =
+            std::env::temp_dir().join(format!("hw-cli-tab-completion-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        std::fs::create_dir_all(&temp_dir).expect("temp dir can be created");
+        std::fs::write(temp_dir.join("game.yaml"), "").expect("temp file can be written");
+        std::fs::write(temp_dir.join("history.hw"), "").expect("temp file can be written");
+
+        let prefix = format!("{}/g", temp_dir.display());
+        let line = format!("load {prefix}");
+        assert_eq!(
+            completion_candidates(&line, line.len(), &CompletionSnapshot::default()),
+            Some((5, vec![temp_dir.join("game.yaml").display().to_string()]))
+        );
+
+        std::fs::remove_dir_all(&temp_dir).expect("temp dir can be removed");
     }
 
     #[test]

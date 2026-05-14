@@ -40,6 +40,10 @@ expand it to the full command word, such as `b` to `build`, `x` to
 partials such as `s` or `sa`, and lines containing `;`, are left
 unchanged.
 
+After the command word, Tab suggests parser-level arguments: current
+system IDs, visible compact pieces, travel target words, catastrophe
+colors, and file paths for save/load commands.
+
 Interactive history is session-only. It includes setup lines and typed
 commands, but not commands replayed from files and not `save-history` /
 `sh` itself.
