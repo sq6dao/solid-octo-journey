@@ -18,7 +18,9 @@ explicit turn end. `legal_decisions` returns an empty list for terminal
 games and includes `EndTurn` only when the engine accepts ending the
 current turn.
 
-Build actions are generated for bank-available current-player ships, then
-filtered through the engine before being returned.
+Build actions are generated for bank-available current-player ships.
+Travel actions are generated for owned ships to existing systems and
+one-star new discoveries. The engine filter removes illegal candidates
+before they are returned.
 
 Other action families are being added incrementally as AI-1 matures.

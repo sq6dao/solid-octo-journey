@@ -229,8 +229,8 @@ Rule constraints for legal generation:
 Initial action coverage:
 
 - [x] Build from every plausible bank ship candidate
-- [ ] Travel owned ships to existing systems
-- [ ] Travel owned ships to new one-star discoveries
+- [x] Travel owned ships to existing systems
+- [x] Travel owned ships to new one-star discoveries
 - [ ] Trade owned ships to same-size bank ships of other colors
 - [ ] Sacrifice owned ships
 - [ ] Invade opponent ships in shared systems
