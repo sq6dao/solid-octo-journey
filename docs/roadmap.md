@@ -213,7 +213,7 @@ Rule constraints for legal generation:
 
 #### AI-1: Legal Decisions
 
-- [ ] Add the `hw-ai` workspace crate
+- [x] Add the `hw-ai` workspace crate
 - [ ] Generate deterministic legal `AiDecision` values from `Game`
 - [ ] Include `EndTurn` only when `game.end_turn()` succeeds
 - [ ] Generate legal catastrophes even at zero action budget

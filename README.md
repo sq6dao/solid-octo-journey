@@ -7,6 +7,7 @@ A modular Rust engine for a two-player Homeworlds-style game.
 - `hw-core`: core domain types and invariants.
 - `hw-engine`: actions, validation, transitions, turns, and game flow.
 - `hw-cli`: simple text hot-seat interface.
+- `hw-ai`: deterministic reusable AI decision support.
 
 ## Current Features
 
