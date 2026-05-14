@@ -4,6 +4,12 @@ use crate::{Color, Piece, Player, Size};
 pub enum BankError {
     PieceUnavailable,
     OwnedPiece,
+    TooManyPieces {
+        color: Color,
+        size: Size,
+        count: u8,
+        max: u8,
+    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -24,6 +30,25 @@ impl Bank {
 
     pub const fn count(&self, color: Color, size: Size) -> u8 {
         self.counts[color.index()][size.index()]
+    }
+
+    pub fn from_counts(counts: [[u8; Size::COUNT]; Color::COUNT]) -> Result<Self, BankError> {
+        for color in Color::ALL {
+            for size in Size::ALL {
+                let count = counts[color.index()][size.index()];
+                let max = Self::copies_per_piece();
+                if count > max {
+                    return Err(BankError::TooManyPieces {
+                        color,
+                        size,
+                        count,
+                        max,
+                    });
+                }
+            }
+        }
+
+        Ok(Self { counts })
     }
 
     pub fn draw(&mut self, color: Color, size: Size) -> Result<Piece, BankError> {
@@ -67,6 +92,36 @@ mod tests {
                 assert_eq!(bank.count(color, size), Bank::copies_per_piece());
             }
         }
+    }
+
+    #[test]
+    fn bank_can_be_constructed_from_counts() {
+        let mut counts = [[Bank::copies_per_piece(); Size::COUNT]; Color::COUNT];
+        counts[Color::Red.index()][Size::Small.index()] = 1;
+
+        let bank = Bank::from_counts(counts).expect("counts are valid");
+
+        assert_eq!(bank.count(Color::Red, Size::Small), 1);
+        assert_eq!(
+            bank.count(Color::Blue, Size::Large),
+            Bank::copies_per_piece()
+        );
+    }
+
+    #[test]
+    fn bank_rejects_counts_above_the_copy_limit() {
+        let mut counts = [[Bank::copies_per_piece(); Size::COUNT]; Color::COUNT];
+        counts[Color::Yellow.index()][Size::Medium.index()] = Bank::copies_per_piece() + 1;
+
+        assert_eq!(
+            Bank::from_counts(counts),
+            Err(BankError::TooManyPieces {
+                color: Color::Yellow,
+                size: Size::Medium,
+                count: Bank::copies_per_piece() + 1,
+                max: Bank::copies_per_piece(),
+            })
+        );
     }
 
     #[test]

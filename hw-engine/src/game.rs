@@ -60,6 +60,10 @@ impl HomeworldSetup {
 }
 
 impl Game {
+    pub const fn from_parts(turn: TurnState, status: GameStatus) -> Self {
+        Self { turn, status }
+    }
+
     pub fn new(
         homeworlds: [HomeworldSetup; Player::COUNT],
         starting_player: Player,

@@ -37,6 +37,20 @@ impl TurnState {
         }
     }
 
+    pub const fn from_parts(
+        state: GameState,
+        current_player: Player,
+        remaining_actions: usize,
+        required_action: Option<ActionKind>,
+    ) -> Self {
+        Self {
+            state,
+            current_player,
+            remaining_actions,
+            required_action,
+        }
+    }
+
     pub const fn state(&self) -> &GameState {
         &self.state
     }
@@ -47,6 +61,10 @@ impl TurnState {
 
     pub const fn remaining_actions(&self) -> usize {
         self.remaining_actions
+    }
+
+    pub const fn required_action(&self) -> Option<ActionKind> {
+        self.required_action
     }
 
     pub fn apply_action(&self, action: &Action) -> Result<Self, TurnError> {
