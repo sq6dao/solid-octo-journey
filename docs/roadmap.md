@@ -165,12 +165,53 @@ Minimal playable interface
 
 ---
 
-## Phase 6 – Extensions (Future)
+## Phase 6 – Serialization
 
-- [ ] AI player (minimax / heuristics)
-- [ ] Serialization (save/load)
+### Goal
+Stable save/load support and state interchange.
+
+- [ ] Add serialization support for public core and engine state types
+- [ ] Serialize and deserialize `Game`, `GameState`, `StarSystem`,
+  `Piece`, `Bank`, actions, turn state, and game status
+- [ ] Define a v1 save file format, likely JSON
+- [ ] Add save/load support to the CLI
+- [ ] Add round-trip tests and compatibility fixtures
+
+---
+
+## Phase 7 – AI Player
+
+### Goal
+Deterministic computer player support.
+
+- [ ] Generate legal actions from a game state
+- [ ] Add a basic heuristic evaluator
+- [ ] Implement one-ply or shallow-search move selection
+- [ ] Add human-vs-AI support to the CLI
+- [ ] Test deterministic move selection and terminal-state handling
+
+---
+
+## Phase 8 – TUI Interface
+
+### Goal
+Richer playable terminal UI, probably with Ratatui.
+
+- [ ] Add Ratatui-based application shell
+- [ ] Render board and system state panels
+- [ ] Add command/input panel
+- [ ] Show turn, action budget, errors, and game outcome feedback
+- [ ] Add help/reference view
+- [ ] Integrate save/load once serialization exists
+
+---
+
+## Phase 9 – Future Plans
+
 - [ ] Network multiplayer
 - [ ] GUI (optional)
+- [ ] Stronger AI search and heuristics
+- [ ] Replay/history tooling
 
 ---
 
@@ -191,3 +232,6 @@ For every feature:
 - M2: All actions implemented
 - M3: Fully playable via CLI
 - M4: Stable test suite
+- M5: Save/load support
+- M6: AI opponent
+- M7: TUI playable interface
