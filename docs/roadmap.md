@@ -138,10 +138,10 @@ Playable game loop (engine-level, no UI yet)
 ### Goal
 Minimal playable interface
 
-- [ ] Command parsing
-- [ ] Text-based rendering
-- [ ] Input validation
-- [ ] Turn feedback
+- [x] Command parsing
+- [x] Text-based rendering
+- [x] Input validation
+- [x] Turn feedback
 
 ---
 
