@@ -136,19 +136,7 @@ Playable game loop (engine-level, no UI yet)
 
 ---
 
-## Phase 4 – CLI Interface (hw-cli)
-
-### Goal
-Minimal playable interface
-
-- [x] Command parsing
-- [x] Text-based rendering
-- [x] Input validation
-- [x] Turn feedback
-
----
-
-## Phase 5 – Testing Expansion
+## Phase 4 – Testing Expansion
 
 ### Unit Tests
 - [x] Piece invariants
@@ -162,6 +150,18 @@ Minimal playable interface
 - [x] Full turn sequences
 - [x] Known game scenarios
 - [x] Edge cases (catastrophes, sacrifices)
+
+---
+
+## Phase 5 – CLI Interface (hw-cli)
+
+### Goal
+Minimal playable interface
+
+- [x] Command parsing
+- [x] Text-based rendering
+- [x] Input validation
+- [x] Turn feedback
 
 ---
 
@@ -230,8 +230,9 @@ For every feature:
 
 - M1: Core domain complete
 - M2: All actions implemented
-- M3: Fully playable via CLI
+- M3: Engine game flow complete
 - M4: Stable test suite
-- M5: Save/load support
-- M6: AI opponent
-- M7: TUI playable interface
+- M5: Fully playable via CLI
+- M6: Save/load support
+- M7: AI opponent
+- M8: TUI playable interface
