@@ -19,6 +19,7 @@ pub fn legal_decisions(game: &Game) -> Vec<AiDecision> {
     push_trade_decisions(game, &mut decisions);
     push_sacrifice_decisions(game, &mut decisions);
     push_invade_decisions(game, &mut decisions);
+    push_catastrophe_decisions(game, &mut decisions);
     decisions
 }
 
@@ -209,6 +210,17 @@ fn push_invade_decisions(game: &Game, decisions: &mut Vec<AiDecision>) {
     }
 }
 
+fn push_catastrophe_decisions(game: &Game, decisions: &mut Vec<AiDecision>) {
+    let state = game.turn().state();
+
+    for system_index in 0..state.systems().len() {
+        let system = SystemId::new(system_index);
+        for color in Color::ALL {
+            push_legal_action(game, decisions, Action::Catastrophe { system, color });
+        }
+    }
+}
+
 fn paid_actions_allowed(game: &Game, action_kind: ActionKind) -> bool {
     game.turn().remaining_actions() > 0
         && game
@@ -218,12 +230,12 @@ fn paid_actions_allowed(game: &Game, action_kind: ActionKind) -> bool {
 }
 
 fn push_legal_action(game: &Game, decisions: &mut Vec<AiDecision>, action: Action) {
-    let decision = AiDecision::Action(action);
-    let AiDecision::Action(action) = &decision else {
-        unreachable!("constructed an action decision")
-    };
+    if game.apply_action(&action).is_err() {
+        return;
+    }
 
-    if game.apply_action(action).is_ok() && !decisions.contains(&decision) {
+    let decision = AiDecision::Action(action);
+    if !decisions.contains(&decision) {
         decisions.push(decision);
     }
 }
@@ -407,6 +419,22 @@ mod tests {
     }
 
     #[test]
+    fn catastrophe_decisions_are_generated_at_zero_budget() {
+        let game = catastrophe_game(0);
+
+        assert_eq!(
+            legal_decisions(&game),
+            vec![
+                AiDecision::EndTurn,
+                AiDecision::Action(Action::Catastrophe {
+                    system: SystemId::new(0),
+                    color: Color::Red,
+                }),
+            ]
+        );
+    }
+
+    #[test]
     fn invade_decisions_include_opponent_ships() {
         let game = invade_game();
         let decisions = legal_decisions(&game);
@@ -417,6 +445,61 @@ mod tests {
             system: SystemId::new(0),
             target: Piece::owned(Color::Green, Size::Small, Player::Two),
         })));
+    }
+
+    #[test]
+    fn every_generated_action_applies_for_representative_positions() {
+        for game in [
+            Game::default(Player::One),
+            existing_travel_game(),
+            invade_game(),
+            catastrophe_game(1),
+        ] {
+            assert_all_actions_apply(&game, &legal_decisions(&game));
+        }
+    }
+
+    #[test]
+    fn duplicate_equivalent_decisions_are_removed() {
+        let game = duplicate_ship_game();
+        let sacrifice = AiDecision::Action(Action::Sacrifice {
+            player: Player::One,
+            system: SystemId::new(0),
+            ship: Piece::owned(Color::Green, Size::Small, Player::One),
+        });
+
+        assert_eq!(
+            legal_decisions(&game)
+                .into_iter()
+                .filter(|decision| *decision == sacrifice)
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn action_family_order_is_deterministic() {
+        let decisions = legal_decisions(&Game::default(Player::One));
+        let mut families = Vec::new();
+
+        for family in decisions.iter().filter_map(|decision| match decision {
+            AiDecision::Action(action) => Some(action.kind()),
+            AiDecision::EndTurn => None,
+        }) {
+            if families.last() != Some(&family) {
+                families.push(family);
+            }
+        }
+
+        assert_eq!(
+            families,
+            vec![
+                ActionKind::Build,
+                ActionKind::Travel,
+                ActionKind::Trade,
+                ActionKind::Sacrifice,
+            ]
+        );
     }
 
     fn assert_all_actions_apply(game: &Game, decisions: &[AiDecision]) {
@@ -461,6 +544,70 @@ mod tests {
                     vec![
                         Piece::owned(Color::Red, Size::Large, Player::One),
                         Piece::owned(Color::Green, Size::Small, Player::Two),
+                    ],
+                )
+                .expect("system is valid"),
+                StarSystem::new(
+                    vec![
+                        Piece::new(Color::Blue, Size::Medium),
+                        Piece::new(Color::Yellow, Size::Large),
+                    ],
+                    vec![Piece::owned(Color::Blue, Size::Small, Player::Two)],
+                )
+                .expect("system is valid"),
+            ],
+            [SystemId::new(0), SystemId::new(1)],
+            Bank::new(),
+        )
+        .expect("state is valid");
+
+        Game::from_parts(TurnState::new(state, Player::One), GameStatus::InProgress)
+    }
+
+    fn catastrophe_game(remaining_actions: usize) -> Game {
+        use hw_core::{Bank, GameState, StarSystem};
+
+        let state = GameState::new(
+            vec![
+                StarSystem::new(
+                    vec![
+                        Piece::new(Color::Red, Size::Small),
+                        Piece::new(Color::Red, Size::Medium),
+                    ],
+                    vec![
+                        Piece::owned(Color::Red, Size::Large, Player::One),
+                        Piece::owned(Color::Red, Size::Small, Player::Two),
+                    ],
+                )
+                .expect("system is valid"),
+                StarSystem::new(
+                    vec![
+                        Piece::new(Color::Blue, Size::Small),
+                        Piece::new(Color::Yellow, Size::Medium),
+                    ],
+                    vec![Piece::owned(Color::Blue, Size::Small, Player::Two)],
+                )
+                .expect("system is valid"),
+            ],
+            [SystemId::new(0), SystemId::new(1)],
+            Bank::new(),
+        )
+        .expect("state is valid");
+        let turn = TurnState::from_parts(state, Player::One, remaining_actions, None);
+
+        Game::from_parts(turn, GameStatus::InProgress)
+    }
+
+    fn duplicate_ship_game() -> Game {
+        use hw_core::{Bank, GameState, StarSystem};
+
+        let state = GameState::new(
+            vec![
+                StarSystem::new(
+                    vec![Piece::new(Color::Green, Size::Small)],
+                    vec![
+                        Piece::owned(Color::Green, Size::Small, Player::One),
+                        Piece::owned(Color::Green, Size::Small, Player::One),
                     ],
                 )
                 .expect("system is valid"),

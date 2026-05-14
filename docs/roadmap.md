@@ -194,15 +194,14 @@ AI support should start as a reusable engine-adjacent layer, not as
 CLI-only logic. The first implementation should live in a new `hw-ai`
 crate that depends on `hw-core` and `hw-engine`.
 
-The first public AI unit is one decision at a time:
+The first public AI unit generates one legal decision at a time:
 
 - `AiDecision::Action(Action)`
 - `AiDecision::EndTurn`
 - `legal_decisions(game: &Game) -> Vec<AiDecision>`
-- `Strategy`, with a deterministic `FirstLegalStrategy`
 
-The UI driver can repeatedly ask a strategy for the next decision until
-the turn passes or the game ends.
+Strategy APIs start in AI-2. A future UI driver can repeatedly ask a
+strategy for the next decision until the turn passes or the game ends.
 
 Rule constraints for legal generation:
 
@@ -214,17 +213,17 @@ Rule constraints for legal generation:
 #### AI-1: Legal Decisions
 
 - [x] Add the `hw-ai` workspace crate
-- [ ] Generate deterministic legal `AiDecision` values from `Game`
-- [ ] Include `EndTurn` only when `game.end_turn()` succeeds
-- [ ] Generate legal catastrophes even at zero action budget
-- [ ] Generate paid actions only when budget and sacrifice action-kind
+- [x] Generate deterministic legal `AiDecision` values from `Game`
+- [x] Include `EndTurn` only when `game.end_turn()` succeeds
+- [x] Generate legal catastrophes even at zero action budget
+- [x] Generate paid actions only when budget and sacrifice action-kind
   restrictions allow them
-- [ ] Filter candidate actions through existing `Game::apply_action`
-- [ ] Use deterministic ordering by system ID, action kind, color, size,
+- [x] Filter candidate actions through existing `Game::apply_action`
+- [x] Use deterministic ordering by system ID, action kind, color, size,
   and piece order
-- [ ] Remove duplicate equivalent decisions
-- [ ] Test that every generated action applies successfully
-- [ ] Test that no generated decision discovers a two-star system
+- [x] Remove duplicate equivalent decisions
+- [x] Test that every generated action applies successfully
+- [x] Test that no generated decision discovers a two-star system
 
 Initial action coverage:
 
@@ -234,7 +233,7 @@ Initial action coverage:
 - [x] Trade owned ships to same-size bank ships of other colors
 - [x] Sacrifice owned ships
 - [x] Invade opponent ships in shared systems
-- [ ] Catastrophe for every overpopulated system/color
+- [x] Catastrophe for every overpopulated system/color
 
 #### AI-2: Baseline Strategies
 

@@ -23,7 +23,9 @@ Travel actions are generated for owned ships to existing systems and
 one-star new discoveries. Trade actions are generated from owned ships to
 same-size bank-available ships of other colors. Sacrifice actions are
 generated for owned ships. Invade actions are generated for opponent
-ships. The engine filter removes illegal candidates before they are
-returned.
+ships. Catastrophe actions are generated for overpopulated system/color
+pairs even when no paid action budget remains.
 
-Other action families are being added incrementally as AI-1 matures.
+The engine filter removes illegal candidates before they are returned.
+Equivalent decisions are deduplicated while preserving deterministic
+order.
