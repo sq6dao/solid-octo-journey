@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 hw-core = { path = "../hw-core" }
 hw-engine = { path = "../hw-engine" }
+rustyline = { version = "18", default-features = false }

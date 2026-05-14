@@ -1,11 +1,12 @@
 use std::{
     fmt, fs,
-    io::{self, BufRead, Write},
+    io::{self, BufRead, IsTerminal, Write},
     path::{Path, PathBuf},
 };
 
 use hw_core::Player;
 use hw_engine::{Game, GameStatus, HomeworldSetup, has_possible_catastrophe, save};
+use rustyline::{DefaultEditor, error::ReadlineError};
 
 use crate::{
     parser::{ParsedCommand, parse_input, parse_setup},
@@ -28,15 +29,119 @@ struct LoadedHistory {
 
 type TypedHistory = Vec<String>;
 
+enum PromptLine {
+    Eof,
+    Interrupted,
+    Read(String),
+}
+
+trait LineInput {
+    fn read_prompted_line<W: Write>(
+        &mut self,
+        prompt: &str,
+        output: &mut W,
+    ) -> io::Result<PromptLine>;
+
+    fn add_history_entry(&mut self, line: &str) -> io::Result<()>;
+}
+
+struct ScriptedLineInput<R> {
+    input: R,
+}
+
+impl<R> ScriptedLineInput<R> {
+    fn new(input: R) -> Self {
+        Self { input }
+    }
+}
+
+impl<R: BufRead> LineInput for ScriptedLineInput<R> {
+    fn read_prompted_line<W: Write>(
+        &mut self,
+        prompt: &str,
+        output: &mut W,
+    ) -> io::Result<PromptLine> {
+        write!(output, "{prompt}")?;
+        output.flush()?;
+
+        let mut line = String::new();
+        if self.input.read_line(&mut line)? == 0 {
+            Ok(PromptLine::Eof)
+        } else {
+            Ok(PromptLine::Read(line))
+        }
+    }
+
+    fn add_history_entry(&mut self, _line: &str) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+struct RustylineInput {
+    editor: DefaultEditor,
+}
+
+impl RustylineInput {
+    fn new() -> io::Result<Self> {
+        let editor = DefaultEditor::new().map_err(readline_error_to_io)?;
+        Ok(Self { editor })
+    }
+}
+
+impl LineInput for RustylineInput {
+    fn read_prompted_line<W: Write>(
+        &mut self,
+        prompt: &str,
+        output: &mut W,
+    ) -> io::Result<PromptLine> {
+        output.flush()?;
+
+        match self.editor.readline(prompt) {
+            Ok(line) => Ok(PromptLine::Read(line)),
+            Err(ReadlineError::Eof) => Ok(PromptLine::Eof),
+            Err(ReadlineError::Interrupted) => Ok(PromptLine::Interrupted),
+            Err(error) => Err(readline_error_to_io(error)),
+        }
+    }
+
+    fn add_history_entry(&mut self, line: &str) -> io::Result<()> {
+        self.editor
+            .add_history_entry(line.to_owned())
+            .map(|_| ())
+            .map_err(readline_error_to_io)
+    }
+}
+
+fn readline_error_to_io(error: ReadlineError) -> io::Error {
+    match error {
+        ReadlineError::Io(error) => error,
+        error => io::Error::other(error.to_string()),
+    }
+}
+
 pub fn run_stdio() -> io::Result<()> {
     let stdin = io::stdin();
     let stdout = io::stdout();
-    run(stdin.lock(), stdout.lock())
+    if !stdin.is_terminal() {
+        return run(stdin.lock(), stdout.lock());
+    }
+
+    let mut input = RustylineInput::new()?;
+    run_with_line_input(&mut input, stdout.lock())
 }
 
-pub fn run<R, W>(mut input: R, mut output: W) -> io::Result<()>
+pub fn run<R, W>(input: R, output: W) -> io::Result<()>
 where
     R: BufRead,
+    W: Write,
+{
+    let mut input = ScriptedLineInput::new(input);
+    run_with_line_input(&mut input, output)
+}
+
+fn run_with_line_input<I, W>(input: &mut I, mut output: W) -> io::Result<()>
+where
+    I: LineInput,
     W: Write,
 {
     writeln!(output, "Homeworlds hot seat")?;
@@ -46,7 +151,7 @@ where
     )?;
 
     let mut typed_history = TypedHistory::new();
-    let Some(prompted) = prompt_game(&mut input, &mut output, &mut typed_history)? else {
+    let Some(prompted) = prompt_game(input, &mut output, &mut typed_history)? else {
         return Ok(());
     };
     let mut game = prompted.game;
@@ -64,19 +169,14 @@ where
         render_after_semicolon(prompted.show_after, &game, &mut output)?;
     }
 
-    let mut line = String::new();
     loop {
-        write!(output, "{}> ", prompt_label(game.turn().current_player()))?;
-        output.flush()?;
-
-        if read_line(&mut input, &mut line)? == ReadLine::Eof {
+        let prompt = format!("{}> ", prompt_label(game.turn().current_player()));
+        let Some(line) = read_prompted_line(input, &prompt, &mut output)? else {
             break;
-        }
+        };
 
         let command = line.trim();
-        if !is_save_history_command(command) {
-            record_typed_history(&mut typed_history, command);
-        }
+        record_user_history(input, &mut typed_history, command)?;
 
         if run_command(command, &mut game, &mut output, 0, &typed_history)? == CommandOutcome::Quit
         {
@@ -285,11 +385,22 @@ fn auto_end_turn_if_ready<W: Write>(game: &mut Game, output: &mut W) -> io::Resu
     Ok(())
 }
 
-fn record_typed_history(history: &mut TypedHistory, line: &str) {
+fn record_user_history<I: LineInput>(
+    input: &mut I,
+    history: &mut TypedHistory,
+    line: &str,
+) -> io::Result<()> {
     let trimmed = line.trim();
-    if !trimmed.is_empty() {
+    if should_record_user_history(trimmed) {
         history.push(trimmed.to_owned());
+        input.add_history_entry(trimmed)?;
     }
+    Ok(())
+}
+
+fn should_record_user_history(line: &str) -> bool {
+    let trimmed = line.trim();
+    !trimmed.is_empty() && !is_save_history_command(trimmed)
 }
 
 fn is_save_history_command(command: &str) -> bool {
@@ -362,13 +473,31 @@ fn render_after_semicolon<W: Write>(
     Ok(())
 }
 
-fn prompt_game<R, W>(
-    input: &mut R,
+fn read_prompted_line<I, W>(
+    input: &mut I,
+    prompt: &str,
+    output: &mut W,
+) -> io::Result<Option<String>>
+where
+    I: LineInput,
+    W: Write,
+{
+    loop {
+        match input.read_prompted_line(prompt, output)? {
+            PromptLine::Read(line) => return Ok(Some(line)),
+            PromptLine::Eof => return Ok(None),
+            PromptLine::Interrupted => continue,
+        }
+    }
+}
+
+fn prompt_game<I, W>(
+    input: &mut I,
     output: &mut W,
     typed_history: &mut TypedHistory,
 ) -> io::Result<Option<PromptedGame>>
 where
-    R: BufRead,
+    I: LineInput,
     W: Write,
 {
     loop {
@@ -408,28 +537,24 @@ enum SetupPrompt {
     Eof,
 }
 
-fn prompt_setup<R, W>(
-    input: &mut R,
+fn prompt_setup<I, W>(
+    input: &mut I,
     output: &mut W,
     player: Player,
     typed_history: &mut TypedHistory,
 ) -> io::Result<SetupPrompt>
 where
-    R: BufRead,
+    I: LineInput,
     W: Write,
 {
-    let mut stars = String::new();
-    let mut ship = String::new();
-
     loop {
         writeln!(output, "{} setup", player_label(player))?;
-        write!(output, "{} stars> ", player_label(player))?;
-        output.flush()?;
-        if read_line(input, &mut stars)? == ReadLine::Eof {
+        let prompt = format!("{} stars> ", player_label(player));
+        let Some(stars) = read_prompted_line(input, &prompt, output)? else {
             return Ok(SetupPrompt::Eof);
-        }
+        };
         let stars_line = stars.trim();
-        record_typed_history(typed_history, stars_line);
+        record_user_history(input, typed_history, stars_line)?;
 
         if let Some(parsed) = parse_setup_load(stars_line) {
             match parsed {
@@ -443,13 +568,12 @@ where
             continue;
         }
 
-        write!(output, "{} ship> ", player_label(player))?;
-        output.flush()?;
-        if read_line(input, &mut ship)? == ReadLine::Eof {
+        let prompt = format!("{} ship> ", player_label(player));
+        let Some(ship) = read_prompted_line(input, &prompt, output)? else {
             return Ok(SetupPrompt::Eof);
-        }
+        };
         let ship_line = ship.trim();
-        record_typed_history(typed_history, ship_line);
+        record_user_history(input, typed_history, ship_line)?;
 
         match parse_setup(stars_line, ship_line, player) {
             Ok(setup) => return Ok(SetupPrompt::Setup(setup)),
@@ -597,21 +721,6 @@ fn history_command(line: &str) -> Option<&str> {
     (!command.is_empty()).then_some(command)
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum ReadLine {
-    Eof,
-    Read,
-}
-
-fn read_line<R: BufRead>(input: &mut R, line: &mut String) -> io::Result<ReadLine> {
-    line.clear();
-    if input.read_line(line)? == 0 {
-        Ok(ReadLine::Eof)
-    } else {
-        Ok(ReadLine::Read)
-    }
-}
-
 fn format_game_error(error: &hw_engine::GameError) -> String {
     format!("{error:?}")
 }
@@ -632,9 +741,82 @@ fn player_label(player: Player) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs, io::Cursor, path::PathBuf};
+    use std::{collections::VecDeque, fs, io::Cursor, path::PathBuf};
 
     use super::*;
+
+    #[derive(Default)]
+    struct RecordingLineInput {
+        lines: VecDeque<String>,
+        prompts: Vec<String>,
+        history_entries: Vec<String>,
+    }
+
+    impl RecordingLineInput {
+        fn new(lines: impl IntoIterator<Item = &'static str>) -> Self {
+            Self {
+                lines: lines.into_iter().map(str::to_owned).collect(),
+                prompts: Vec::new(),
+                history_entries: Vec::new(),
+            }
+        }
+    }
+
+    impl LineInput for RecordingLineInput {
+        fn read_prompted_line<W: Write>(
+            &mut self,
+            prompt: &str,
+            _output: &mut W,
+        ) -> io::Result<PromptLine> {
+            self.prompts.push(prompt.to_owned());
+            Ok(self
+                .lines
+                .pop_front()
+                .map_or(PromptLine::Eof, PromptLine::Read))
+        }
+
+        fn add_history_entry(&mut self, line: &str) -> io::Result<()> {
+            self.history_entries.push(line.to_owned());
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn line_input_prompts_and_records_shared_session_history() {
+        let mut input = RecordingLineInput::new(["ys bm", "gs", "bl rl", "rm", "show", "q"]);
+        let mut output = Vec::new();
+
+        run_with_line_input(&mut input, &mut output).expect("session runs");
+
+        assert_eq!(
+            input.prompts,
+            [
+                "Player 1 stars> ",
+                "Player 1 ship> ",
+                "Player 2 stars> ",
+                "Player 2 ship> ",
+                "P1> ",
+                "P1> ",
+            ]
+        );
+        assert_eq!(
+            input.history_entries,
+            ["ys bm", "gs", "bl rl", "rm", "show", "q"]
+        );
+    }
+
+    #[test]
+    fn user_history_policy_filters_empty_and_save_history_lines() {
+        assert!(should_record_user_history("ys bm"));
+        assert!(should_record_user_history("show"));
+        assert!(should_record_user_history("q"));
+
+        assert!(!should_record_user_history(""));
+        assert!(!should_record_user_history("   "));
+        assert!(!should_record_user_history("save-history game.yaml"));
+        assert!(!should_record_user_history("sh game.yaml"));
+        assert!(!should_record_user_history("SH game.yaml"));
+    }
 
     #[test]
     fn show_prints_the_current_game_state() {
