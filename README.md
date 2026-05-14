@@ -52,7 +52,8 @@ c 1 r
 q
 ```
 
-Append `;` to a successful command to print the game state afterward:
+Append `;` to a command to print the game state afterward, including
+after errors:
 
 ```text
 b 0 gs;

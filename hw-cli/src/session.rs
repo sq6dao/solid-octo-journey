@@ -111,6 +111,8 @@ fn run_command<W: Write>(
         return Ok(CommandOutcome::Continue);
     }
 
+    let show_after_error = command_requests_state_after_error(command);
+
     match parse_input(command, game.turn().current_player()) {
         Ok(parsed) => match parsed.command {
             ParsedCommand::Help => {
@@ -132,7 +134,10 @@ fn run_command<W: Write>(
                         writeln!(output, "Saved to {}.", path.display())?;
                         render_after_semicolon(parsed.show_after, game, output)?;
                     }
-                    Err(error) => writeln!(output, "Error: {error}")?,
+                    Err(error) => {
+                        writeln!(output, "Error: {error}")?;
+                        render_after_semicolon(parsed.show_after, game, output)?;
+                    }
                 }
                 Ok(CommandOutcome::Continue)
             }
@@ -165,6 +170,7 @@ fn run_command<W: Write>(
                     }
                     Err(error) => {
                         writeln!(output, "Error: {error}")?;
+                        render_after_semicolon(parsed.show_after, game, output)?;
                         Ok(CommandOutcome::Continue)
                     }
                 }
@@ -177,7 +183,10 @@ fn run_command<W: Write>(
                         write!(output, "{}", render_turn_summary(game))?;
                         render_after_semicolon(parsed.show_after, game, output)?;
                     }
-                    Err(error) => writeln!(output, "Error: {}", format_game_error(&error))?,
+                    Err(error) => {
+                        writeln!(output, "Error: {}", format_game_error(&error))?;
+                        render_after_semicolon(parsed.show_after, game, output)?;
+                    }
                 }
                 Ok(CommandOutcome::Continue)
             }
@@ -189,16 +198,25 @@ fn run_command<W: Write>(
                         write!(output, "{}", render_turn_summary(game))?;
                         render_after_semicolon(parsed.show_after, game, output)?;
                     }
-                    Err(error) => writeln!(output, "Error: {}", format_game_error(&error))?,
+                    Err(error) => {
+                        writeln!(output, "Error: {}", format_game_error(&error))?;
+                        render_after_semicolon(parsed.show_after, game, output)?;
+                    }
                 }
                 Ok(CommandOutcome::Continue)
             }
         },
         Err(error) => {
             writeln!(output, "Error: {}", error.message())?;
+            render_after_semicolon(show_after_error, game, output)?;
             Ok(CommandOutcome::Continue)
         }
     }
+}
+
+fn command_requests_state_after_error(command: &str) -> bool {
+    let trimmed = command.trim();
+    matches!(trimmed.find(';'), Some(index) if index == trimmed.len() - 1)
 }
 
 fn read_load_source(path: &Path) -> Result<LoadSource, LoadSourceError> {
@@ -629,7 +647,7 @@ q
     }
 
     #[test]
-    fn semicolon_does_not_print_state_after_an_error() {
+    fn semicolon_prints_state_after_a_parse_error() {
         let output = run_script(
             "ys bm
 gs
@@ -641,7 +659,27 @@ q
         );
 
         assert!(output.contains("Error: unknown command"));
-        assert_eq!(output.matches("Status: in progress").count(), 0);
+        assert!(output.contains("Status: in progress"));
+        assert!(output.contains("Current player: Player 1"));
+        assert!(output.contains("Remaining actions: 1"));
+    }
+
+    #[test]
+    fn semicolon_prints_state_after_an_action_error() {
+        let output = run_script(
+            "ys bm
+gs
+bl rl
+rm
+b 9 gs;
+q
+",
+        );
+
+        assert!(output.contains("Error: Turn(InvalidAction(InvalidAction(UnknownSystem"));
+        assert!(output.contains("Status: in progress"));
+        assert!(output.contains("Current player: Player 1"));
+        assert!(output.contains("Remaining actions: 1"));
     }
 
     #[test]

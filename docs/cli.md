@@ -125,14 +125,15 @@ t 0 ys x 1
 ## Semicolon Shortcut
 
 Append `;` as the final character of a command to print the game state
-after the command succeeds:
+after the command runs:
 
 ```text
 b 0 gs;
 e;
 ```
 
-If the command fails, the CLI prints the error and does not print state.
+If the command fails, the CLI prints the error and then prints the
+current unchanged state.
 Semicolons are only accepted as the last character:
 
 ```text
