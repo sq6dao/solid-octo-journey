@@ -16,6 +16,7 @@ pub fn legal_decisions(game: &Game) -> Vec<AiDecision> {
     push_end_turn_decision(game, &mut decisions);
     push_build_decisions(game, &mut decisions);
     push_travel_decisions(game, &mut decisions);
+    push_trade_decisions(game, &mut decisions);
     decisions
 }
 
@@ -107,6 +108,42 @@ fn push_travel_decisions(game: &Game, decisions: &mut Vec<AiDecision>) {
                         },
                     );
                 }
+            }
+        }
+    }
+}
+
+fn push_trade_decisions(game: &Game, decisions: &mut Vec<AiDecision>) {
+    if !paid_actions_allowed(game, ActionKind::Trade) {
+        return;
+    }
+
+    let player = game.turn().current_player();
+    let state = game.turn().state();
+
+    for (system_index, system_ref) in state.systems().iter().enumerate() {
+        let system = SystemId::new(system_index);
+        for from in system_ref
+            .ships()
+            .iter()
+            .copied()
+            .filter(|ship| ship.is_owned_by(player))
+        {
+            for color in Color::ALL {
+                if color == from.color() || state.bank().count(color, from.size()) == 0 {
+                    continue;
+                }
+
+                push_legal_action(
+                    game,
+                    decisions,
+                    Action::Trade {
+                        player,
+                        system,
+                        from,
+                        to: Piece::owned(color, from.size(), player),
+                    },
+                );
             }
         }
     }
@@ -245,6 +282,27 @@ mod tests {
         }
 
         assert!(found_discovery);
+    }
+
+    #[test]
+    fn trade_decisions_include_same_size_other_color_bank_ships() {
+        let game = Game::default(Player::One);
+        let decisions = legal_decisions(&game);
+
+        assert_all_actions_apply(&game, &decisions);
+        assert!(decisions.contains(&AiDecision::Action(Action::Trade {
+            player: Player::One,
+            system: SystemId::new(0),
+            from: Piece::owned(Color::Green, Size::Small, Player::One),
+            to: Piece::owned(Color::Red, Size::Small, Player::One),
+        })));
+
+        for decision in decisions {
+            if let AiDecision::Action(Action::Trade { from, to, .. }) = decision {
+                assert_eq!(from.size(), to.size());
+                assert_ne!(from.color(), to.color());
+            }
+        }
     }
 
     fn assert_all_actions_apply(game: &Game, decisions: &[AiDecision]) {

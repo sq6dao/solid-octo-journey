@@ -231,7 +231,7 @@ Initial action coverage:
 - [x] Build from every plausible bank ship candidate
 - [x] Travel owned ships to existing systems
 - [x] Travel owned ships to new one-star discoveries
-- [ ] Trade owned ships to same-size bank ships of other colors
+- [x] Trade owned ships to same-size bank ships of other colors
 - [ ] Sacrifice owned ships
 - [ ] Invade opponent ships in shared systems
 - [ ] Catastrophe for every overpopulated system/color
