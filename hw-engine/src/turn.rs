@@ -1,12 +1,13 @@
-use hw_core::{GameState, Player};
+use hw_core::{Color, GameState, Player, Size};
 
-use crate::{Action, TransitionError};
+use crate::{Action, ActionKind, TransitionError};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TurnState {
     state: GameState,
     current_player: Player,
     remaining_actions: usize,
+    required_action: Option<ActionKind>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -15,6 +16,10 @@ pub enum TurnError {
     WrongPlayer { expected: Player, actual: Player },
     NoActionBudget,
     ActionsRemaining { remaining: usize },
+    WrongSacrificeActionKind {
+        expected: ActionKind,
+        actual: ActionKind,
+    },
 }
 
 impl TurnState {
@@ -23,6 +28,7 @@ impl TurnState {
             state,
             current_player,
             remaining_actions: 1,
+            required_action: None,
         }
     }
 
@@ -46,6 +52,7 @@ impl TurnState {
                 state,
                 current_player: self.current_player,
                 remaining_actions: self.remaining_actions,
+                required_action: self.required_action,
             });
         }
 
@@ -62,12 +69,35 @@ impl TurnState {
             return Err(TurnError::NoActionBudget);
         }
 
+        if let Some(expected) = self.required_action {
+            let actual = action.kind();
+            if actual != expected {
+                return Err(TurnError::WrongSacrificeActionKind { expected, actual });
+            }
+        }
+
         let state = crate::apply_action(&self.state, action).map_err(TurnError::InvalidAction)?;
+
+        if let Action::Sacrifice { ship, .. } = action {
+            return Ok(Self {
+                state,
+                current_player: self.current_player,
+                remaining_actions: sacrifice_budget(ship.size()),
+                required_action: Some(sacrifice_action_kind(ship.color())),
+            });
+        }
+
+        let remaining_actions = self.remaining_actions - 1;
 
         Ok(Self {
             state,
             current_player: self.current_player,
-            remaining_actions: self.remaining_actions - 1,
+            remaining_actions,
+            required_action: if remaining_actions == 0 {
+                None
+            } else {
+                self.required_action
+            },
         })
     }
 
@@ -82,6 +112,7 @@ impl TurnState {
             state: self.state.clone(),
             current_player: other_player(self.current_player),
             remaining_actions: 1,
+            required_action: None,
         })
     }
 }
@@ -104,12 +135,29 @@ const fn other_player(player: Player) -> Player {
     }
 }
 
+const fn sacrifice_budget(size: Size) -> usize {
+    match size {
+        Size::Small => 1,
+        Size::Medium => 2,
+        Size::Large => 3,
+    }
+}
+
+const fn sacrifice_action_kind(color: Color) -> ActionKind {
+    match color {
+        Color::Green => ActionKind::Build,
+        Color::Yellow => ActionKind::Move,
+        Color::Blue => ActionKind::Trade,
+        Color::Red => ActionKind::Invade,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use hw_core::{Bank, Color, GameState, Piece, Player, Size, StarSystem, SystemId};
 
     use super::*;
-    use crate::{Action, ActionError, TransitionError};
+    use crate::{Action, ActionError, MoveTarget, TransitionError};
 
     #[test]
     fn turn_state_tracks_the_current_player_and_state() {
@@ -281,11 +329,178 @@ mod tests {
         assert_eq!(next.remaining_actions(), 1);
     }
 
+    #[test]
+    fn sacrificing_a_small_green_ship_grants_one_build_action() {
+        let sacrifice_ship = owned_ship(Player::One, Color::Green, Size::Small);
+        let turn = TurnState::new(state_with_green_sacrifice_ship(Size::Small), Player::One);
+        let sacrifice = sacrifice_action(Player::One, sacrifice_ship);
+        let build = build_action(
+            Player::One,
+            owned_ship(Player::One, Color::Green, Size::Small),
+        );
+
+        let sacrificed = turn.apply_action(&sacrifice).expect("sacrifice applies");
+        let built = sacrificed.apply_action(&build).expect("build applies");
+
+        assert_eq!(sacrificed.remaining_actions(), 1);
+        assert_eq!(built.remaining_actions(), 0);
+    }
+
+    #[test]
+    fn sacrificing_a_medium_blue_ship_grants_two_trade_actions() {
+        let sacrifice_ship = owned_ship(Player::One, Color::Blue, Size::Medium);
+        let turn = TurnState::new(state_with_blue_sacrifice_fleet(), Player::One);
+        let sacrifice = sacrifice_action(Player::One, sacrifice_ship);
+        let trade_small = trade_action(
+            Player::One,
+            owned_ship(Player::One, Color::Blue, Size::Small),
+            owned_ship(Player::One, Color::Red, Size::Small),
+        );
+        let trade_large = trade_action(
+            Player::One,
+            owned_ship(Player::One, Color::Blue, Size::Large),
+            owned_ship(Player::One, Color::Red, Size::Large),
+        );
+
+        let sacrificed = turn.apply_action(&sacrifice).expect("sacrifice applies");
+        let traded_once = sacrificed
+            .apply_action(&trade_small)
+            .expect("first trade applies");
+        let traded_twice = traded_once
+            .apply_action(&trade_large)
+            .expect("second trade applies");
+
+        assert_eq!(sacrificed.remaining_actions(), 2);
+        assert_eq!(traded_once.remaining_actions(), 1);
+        assert_eq!(traded_twice.remaining_actions(), 0);
+    }
+
+    #[test]
+    fn sacrificing_a_large_green_ship_grants_three_build_actions() {
+        let sacrifice_ship = owned_ship(Player::One, Color::Green, Size::Large);
+        let turn = TurnState::new(state_with_green_sacrifice_ship(Size::Large), Player::One);
+        let sacrifice = sacrifice_action(Player::One, sacrifice_ship);
+        let build = build_action(
+            Player::One,
+            owned_ship(Player::One, Color::Green, Size::Small),
+        );
+
+        let after_sacrifice = turn.apply_action(&sacrifice).expect("sacrifice applies");
+        let after_first_build = after_sacrifice
+            .apply_action(&build)
+            .expect("first build applies");
+        let after_second_build = after_first_build
+            .apply_action(&build)
+            .expect("second build applies");
+        let after_third_build = after_second_build
+            .apply_action(&build)
+            .expect("third build applies");
+
+        assert_eq!(after_sacrifice.remaining_actions(), 3);
+        assert_eq!(after_first_build.remaining_actions(), 2);
+        assert_eq!(after_second_build.remaining_actions(), 1);
+        assert_eq!(after_third_build.remaining_actions(), 0);
+    }
+
+    #[test]
+    fn sacrifice_turns_reject_nonmatching_action_kinds() {
+        let sacrifice_ship = owned_ship(Player::One, Color::Green, Size::Small);
+        let turn = TurnState::new(state_with_green_sacrifice_ship(Size::Small), Player::One);
+        let sacrifice = sacrifice_action(Player::One, sacrifice_ship);
+        let trade = trade_action(
+            Player::One,
+            owned_ship(Player::One, Color::Blue, Size::Small),
+            owned_ship(Player::One, Color::Red, Size::Small),
+        );
+        let sacrificed = turn.apply_action(&sacrifice).expect("sacrifice applies");
+
+        assert_eq!(
+            sacrificed.apply_action(&trade),
+            Err(TurnError::WrongSacrificeActionKind {
+                expected: ActionKind::Build,
+                actual: ActionKind::Trade,
+            })
+        );
+    }
+
+    #[test]
+    fn catastrophe_actions_do_not_consume_sacrifice_budget() {
+        let sacrifice_ship = owned_ship(Player::One, Color::Green, Size::Small);
+        let turn = TurnState::new(state_with_catastrophe_sacrifice(), Player::One);
+        let sacrifice = sacrifice_action(Player::One, sacrifice_ship);
+        let catastrophe = Action::Catastrophe {
+            system: SystemId::new(0),
+            color: Color::Red,
+        };
+        let build = build_action(
+            Player::One,
+            owned_ship(Player::One, Color::Green, Size::Small),
+        );
+
+        let sacrificed = turn.apply_action(&sacrifice).expect("sacrifice applies");
+        let after_catastrophe = sacrificed
+            .apply_action(&catastrophe)
+            .expect("catastrophe applies");
+        let built = after_catastrophe
+            .apply_action(&build)
+            .expect("build applies");
+
+        assert_eq!(after_catastrophe.remaining_actions(), 1);
+        assert_eq!(built.remaining_actions(), 0);
+    }
+
+    #[test]
+    fn ending_a_sacrifice_turn_resets_the_action_kind_limit() {
+        let sacrifice_ship = owned_ship(Player::One, Color::Green, Size::Small);
+        let turn = TurnState::new(state_with_green_sacrifice_ship(Size::Small), Player::One);
+        let sacrifice = sacrifice_action(Player::One, sacrifice_ship);
+        let build = build_action(
+            Player::One,
+            owned_ship(Player::One, Color::Green, Size::Small),
+        );
+        let next_player_move = Action::Move {
+            player: Player::Two,
+            from: SystemId::new(1),
+            ship: owned_ship(Player::Two, Color::Yellow, Size::Small),
+            target: MoveTarget::Existing(SystemId::new(0)),
+        };
+        let spent = turn
+            .apply_action(&sacrifice)
+            .expect("sacrifice applies")
+            .apply_action(&build)
+            .expect("build applies");
+
+        let next_turn = spent.end_turn().expect("turn ends");
+        let moved = next_turn
+            .apply_action(&next_player_move)
+            .expect("move applies");
+
+        assert_eq!(moved.current_player(), Player::Two);
+        assert_eq!(moved.remaining_actions(), 0);
+    }
+
     fn build_action(player: Player, ship: Piece) -> Action {
         Action::Build {
             player,
             system: SystemId::new(0),
             ship,
+        }
+    }
+
+    fn sacrifice_action(player: Player, ship: Piece) -> Action {
+        Action::Sacrifice {
+            player,
+            system: SystemId::new(0),
+            ship,
+        }
+    }
+
+    fn trade_action(player: Player, from: Piece, to: Piece) -> Action {
+        Action::Trade {
+            player,
+            system: SystemId::new(0),
+            from,
+            to,
         }
     }
 
@@ -305,6 +520,81 @@ mod tests {
                         owned_ship(Player::One, Color::Red, Size::Small),
                         owned_ship(Player::Two, Color::Red, Size::Large),
                         owned_ship(Player::One, Color::Green, Size::Small),
+                    ],
+                )
+                .expect("system is valid"),
+                StarSystem::new(
+                    vec![Piece::new(Color::Green, Size::Medium)],
+                    vec![owned_ship(Player::Two, Color::Yellow, Size::Small)],
+                )
+                .expect("system is valid"),
+            ],
+            [SystemId::new(0), SystemId::new(1)],
+            Bank::new(),
+        )
+        .expect("state is valid")
+    }
+
+    fn state_with_green_sacrifice_ship(size: Size) -> GameState {
+        GameState::new(
+            vec![
+                StarSystem::new(
+                    vec![Piece::new(Color::Yellow, Size::Small)],
+                    vec![
+                        owned_ship(Player::One, Color::Green, size),
+                        owned_ship(Player::One, Color::Green, Size::Medium),
+                    ],
+                )
+                .expect("system is valid"),
+                StarSystem::new(
+                    vec![Piece::new(Color::Green, Size::Medium)],
+                    vec![owned_ship(Player::Two, Color::Yellow, Size::Small)],
+                )
+                .expect("system is valid"),
+            ],
+            [SystemId::new(0), SystemId::new(1)],
+            Bank::new(),
+        )
+        .expect("state is valid")
+    }
+
+    fn state_with_blue_sacrifice_fleet() -> GameState {
+        GameState::new(
+            vec![
+                StarSystem::new(
+                    vec![Piece::new(Color::Yellow, Size::Small)],
+                    vec![
+                        owned_ship(Player::One, Color::Blue, Size::Small),
+                        owned_ship(Player::One, Color::Blue, Size::Medium),
+                        owned_ship(Player::One, Color::Blue, Size::Large),
+                    ],
+                )
+                .expect("system is valid"),
+                StarSystem::new(
+                    vec![Piece::new(Color::Green, Size::Medium)],
+                    vec![owned_ship(Player::Two, Color::Yellow, Size::Small)],
+                )
+                .expect("system is valid"),
+            ],
+            [SystemId::new(0), SystemId::new(1)],
+            Bank::new(),
+        )
+        .expect("state is valid")
+    }
+
+    fn state_with_catastrophe_sacrifice() -> GameState {
+        GameState::new(
+            vec![
+                StarSystem::new(
+                    vec![
+                        Piece::new(Color::Red, Size::Small),
+                        Piece::new(Color::Red, Size::Medium),
+                    ],
+                    vec![
+                        owned_ship(Player::One, Color::Red, Size::Small),
+                        owned_ship(Player::Two, Color::Red, Size::Large),
+                        owned_ship(Player::One, Color::Green, Size::Small),
+                        owned_ship(Player::One, Color::Green, Size::Medium),
                     ],
                 )
                 .expect("system is valid"),
