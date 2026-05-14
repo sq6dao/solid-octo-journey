@@ -1,6 +1,6 @@
 use hw_core::{Color, Piece, Player, Size, SystemId};
 use hw_engine::{Action, HomeworldSetup, TravelTarget};
-use std::fmt;
+use std::{fmt, path::PathBuf};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ParsedCommand {
@@ -8,6 +8,8 @@ pub enum ParsedCommand {
     Show,
     End,
     Quit,
+    Save(PathBuf),
+    Load(PathBuf),
     Action(Action),
 }
 
@@ -51,10 +53,21 @@ pub fn parse_input(line: &str, current_player: Player) -> Result<ParsedInput, Pa
 }
 
 pub fn parse_command(line: &str, current_player: Player) -> Result<ParsedCommand, ParseError> {
-    let tokens = tokenize(line);
-    if tokens.is_empty() {
+    let raw_tokens = raw_tokens(line);
+    if raw_tokens.is_empty() {
         return Err(ParseError::new("expected a command"));
     }
+
+    match raw_tokens[0].to_ascii_lowercase().as_str() {
+        "save" | "v" => return parse_file_command(&raw_tokens, ParsedCommand::Save),
+        "load" | "l" => return parse_file_command(&raw_tokens, ParsedCommand::Load),
+        _ => {}
+    }
+
+    let tokens = raw_tokens
+        .iter()
+        .map(|token| token.to_ascii_lowercase())
+        .collect::<Vec<_>>();
 
     match tokens[0].as_str() {
         "help" | "h" => require_no_args(&tokens, ParsedCommand::Help),
@@ -69,6 +82,17 @@ pub fn parse_command(line: &str, current_player: Player) -> Result<ParsedCommand
         "invade" | "i" => parse_invade(&tokens, current_player),
         "catastrophe" | "c" => parse_catastrophe(&tokens),
         other => Err(ParseError::new(format!("unknown command `{other}`"))),
+    }
+}
+
+fn parse_file_command(
+    tokens: &[&str],
+    command: fn(PathBuf) -> ParsedCommand,
+) -> Result<ParsedCommand, ParseError> {
+    match tokens {
+        [_, path] => Ok(command(PathBuf::from(path))),
+        [_] => Err(ParseError::new("expected path")),
+        _ => Err(ParseError::new("unexpected extra input")),
     }
 }
 
@@ -206,9 +230,14 @@ fn parse_catastrophe(tokens: &[String]) -> Result<ParsedCommand, ParseError> {
 }
 
 fn tokenize(line: &str) -> Vec<String> {
-    line.split_whitespace()
+    raw_tokens(line)
+        .into_iter()
         .map(|token| token.to_ascii_lowercase())
         .collect()
+}
+
+fn raw_tokens(line: &str) -> Vec<&str> {
+    line.split_whitespace().collect()
 }
 
 fn require_no_args(tokens: &[String], command: ParsedCommand) -> Result<ParsedCommand, ParseError> {
@@ -339,6 +368,22 @@ mod tests {
         assert_eq!(parse_command("e", Player::One), Ok(ParsedCommand::End));
         assert_eq!(parse_command("quit", Player::One), Ok(ParsedCommand::Quit));
         assert_eq!(parse_command("q", Player::One), Ok(ParsedCommand::Quit));
+        assert_eq!(
+            parse_command("save GameOne.yaml", Player::One),
+            Ok(ParsedCommand::Save(PathBuf::from("GameOne.yaml")))
+        );
+        assert_eq!(
+            parse_command("v GameOne.yaml", Player::One),
+            Ok(ParsedCommand::Save(PathBuf::from("GameOne.yaml")))
+        );
+        assert_eq!(
+            parse_command("load GameOne.yaml", Player::One),
+            Ok(ParsedCommand::Load(PathBuf::from("GameOne.yaml")))
+        );
+        assert_eq!(
+            parse_command("l GameOne.yaml", Player::One),
+            Ok(ParsedCommand::Load(PathBuf::from("GameOne.yaml")))
+        );
     }
 
     #[test]
@@ -377,6 +422,13 @@ mod tests {
                     ship: Piece::owned(Color::Yellow, Size::Small, Player::One),
                     target: TravelTarget::Existing(SystemId::new(1)),
                 }),
+                show_after: true,
+            })
+        );
+        assert_eq!(
+            parse_input("v GameOne.yaml;", Player::One),
+            Ok(ParsedInput {
+                command: ParsedCommand::Save(PathBuf::from("GameOne.yaml")),
                 show_after: true,
             })
         );
@@ -513,6 +565,8 @@ mod tests {
         assert!(parse_command("b 0", Player::One).is_err());
         assert!(parse_command("t 0 ys maybe 1", Player::One).is_err());
         assert!(parse_command("catastrophe 0 purple", Player::One).is_err());
+        assert!(parse_command("save", Player::One).is_err());
+        assert!(parse_command("load game.yaml extra", Player::One).is_err());
         assert_eq!(
             parse_setup("ys", "gm", Player::One)
                 .expect_err("one star setup is invalid")
