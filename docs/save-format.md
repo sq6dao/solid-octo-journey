@@ -35,6 +35,15 @@ systems:
     ships: ["p1:ys", "p2:bs"]
   - stars: [rl]
     ships: ["p1:gm", "p2:yl"]
+
+history:
+  - "ys bm"
+  - "gs"
+  - "bl rl"
+  - "rm"
+
+commands:
+  - "show"
 ```
 
 ## Fields
@@ -49,9 +58,17 @@ systems:
 - `homeworlds`: maps player IDs to system IDs.
 - `bank`: remaining pieces by color and size.
 - `systems`: ordered list of systems; the list index is the system ID.
+- `history`: optional archival CLI input history. The CLI does not replay
+  this field.
+- `commands`: optional CLI commands to replay after loading the saved
+  game state.
 
 Pieces use compact color/size notation such as `ys`, `bm`, or `rl`.
 Ships prefix a piece with the owner, such as `"p1:gs"`.
+
+Normal `save` output omits `history` and `commands`. `save-history` or
+`sh` writes typed session input to `history` and leaves `commands`
+omitted. Hand-authored saves can use `commands` for replay steps.
 
 ## Validation
 

@@ -10,8 +10,25 @@ use crate::{ActionKind, Game, GameOutcome, GameStatus, TurnState};
 
 const SAVE_VERSION: u8 = 1;
 
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct SaveExtras {
+    pub history: Vec<String>,
+    pub commands: Vec<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SavedGame {
+    pub game: Game,
+    pub history: Vec<String>,
+    pub commands: Vec<String>,
+}
+
 pub fn to_yaml(game: &Game) -> Result<String, SaveError> {
     serde_norway::to_string(&SaveFile::from_game(game)).map_err(SaveError::Yaml)
+}
+
+pub fn to_yaml_with_extras(game: &Game, extras: &SaveExtras) -> Result<String, SaveError> {
+    serde_norway::to_string(&SaveFile::from_game_with_extras(game, extras)).map_err(SaveError::Yaml)
 }
 
 pub fn from_yaml(input: &str) -> Result<Game, SaveError> {
@@ -19,8 +36,21 @@ pub fn from_yaml(input: &str) -> Result<Game, SaveError> {
     file.into_game()
 }
 
+pub fn from_yaml_with_extras(input: &str) -> Result<SavedGame, SaveError> {
+    let file = serde_norway::from_str::<SaveFile>(input).map_err(SaveError::Yaml)?;
+    file.into_saved_game()
+}
+
 pub fn save_file(game: &Game, path: impl AsRef<Path>) -> Result<(), SaveError> {
     fs::write(path, to_yaml(game)?).map_err(SaveError::Io)
+}
+
+pub fn save_file_with_extras(
+    game: &Game,
+    extras: &SaveExtras,
+    path: impl AsRef<Path>,
+) -> Result<(), SaveError> {
+    fs::write(path, to_yaml_with_extras(game, extras)?).map_err(SaveError::Io)
 }
 
 pub fn load_file(path: impl AsRef<Path>) -> Result<Game, SaveError> {
@@ -137,10 +167,18 @@ struct SaveFile {
     homeworlds: BTreeMap<String, usize>,
     bank: SaveBank,
     systems: Vec<SaveSystem>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    history: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    commands: Vec<String>,
 }
 
 impl SaveFile {
     fn from_game(game: &Game) -> Self {
+        Self::from_game_with_extras(game, &SaveExtras::default())
+    }
+
+    fn from_game_with_extras(game: &Game, extras: &SaveExtras) -> Self {
         let state = game.turn().state();
         let homeworlds = Player::ALL
             .into_iter()
@@ -167,6 +205,8 @@ impl SaveFile {
                 .iter()
                 .map(SaveSystem::from_system)
                 .collect(),
+            history: extras.history.clone(),
+            commands: extras.commands.clone(),
         }
     }
 
@@ -200,6 +240,18 @@ impl SaveFile {
         let status = self.status.to_status()?;
 
         Ok(Game::from_parts(turn, status))
+    }
+
+    fn into_saved_game(self) -> Result<SavedGame, SaveError> {
+        let history = self.history.clone();
+        let commands = self.commands.clone();
+        let game = self.into_game()?;
+
+        Ok(SavedGame {
+            game,
+            history,
+            commands,
+        })
     }
 }
 
@@ -628,6 +680,58 @@ mod tests {
         assert!(yaml.contains("current_player: p1"));
         assert!(yaml.contains("homeworlds:"));
         assert!(yaml.contains("systems:"));
+        assert!(!yaml.contains("history:"));
+        assert!(!yaml.contains("commands:"));
+    }
+
+    #[test]
+    fn metadata_round_trips_through_yaml() {
+        let game = Game::default(Player::One);
+        let extras = SaveExtras {
+            history: vec!["ys bm".to_owned(), "gs".to_owned(), "show".to_owned()],
+            commands: vec!["show".to_owned(), "b 0 gs;".to_owned()],
+        };
+
+        let yaml = to_yaml_with_extras(&game, &extras).expect("game serializes");
+        let loaded = from_yaml_with_extras(&yaml).expect("game loads");
+
+        assert_eq!(loaded.game, game);
+        assert_eq!(loaded.history, extras.history);
+        assert_eq!(loaded.commands, extras.commands);
+        assert!(yaml.contains("history:"));
+        assert!(yaml.contains("commands:"));
+        assert!(
+            yaml.find("systems:").expect("systems field exists")
+                < yaml.find("history:").expect("history field exists")
+        );
+        assert!(
+            yaml.find("history:").expect("history field exists")
+                < yaml.find("commands:").expect("commands field exists")
+        );
+    }
+
+    #[test]
+    fn game_only_loader_ignores_metadata() {
+        let game = Game::default(Player::One);
+        let yaml = to_yaml_with_extras(
+            &game,
+            &SaveExtras {
+                history: vec!["show".to_owned()],
+                commands: vec!["b 0 gs".to_owned()],
+            },
+        )
+        .expect("game serializes");
+
+        assert_eq!(from_yaml(&yaml).expect("game loads"), game);
+    }
+
+    #[test]
+    fn empty_metadata_is_omitted_from_yaml() {
+        let game = Game::default(Player::One);
+        let yaml = to_yaml_with_extras(&game, &SaveExtras::default()).expect("game serializes");
+
+        assert!(!yaml.contains("history:"));
+        assert!(!yaml.contains("commands:"));
     }
 
     #[test]

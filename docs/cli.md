@@ -81,6 +81,7 @@ Use those IDs in action commands.
 | End turn | `e` | `end` |
 | Quit | `q` | `quit` |
 | Save | `v` | `save <path>` |
+| Save with history | `sh` | `save-history <path>` |
 | Load | `l` | `load <path>` |
 | Build | `b` | `build <system> <piece>` |
 | Travel existing | `t` | `travel <from> <piece> existing <to>` |
@@ -100,6 +101,7 @@ t 0 ys x 1
 t 0 ys n rm bl
 x 0 bs rs
 v game.yaml
+sh game-with-history.yaml
 l game.yaml
 s 0 gm
 i 1 gs
@@ -150,12 +152,14 @@ show; q  # rejected
 
 ## Save And Load
 
-Use `save <path>` or `v <path>` to write a YAML save file. Use
-`load <path>` or `l <path>` to replace the current game with a saved
-game or replay a command history file.
+Use `save <path>` or `v <path>` to write a compact YAML save file. Use
+`save-history <path>` or `sh <path>` to write the same save with typed
+session history metadata. Use `load <path>` or `l <path>` to replace the
+current game with a saved game or replay a command history file.
 
 ```text
 v game.yaml
+sh game-with-history.yaml
 l game.yaml
 l game.yaml;
 ```
@@ -165,7 +169,10 @@ validates the file before replacing the current game; failed loads leave
 the current game unchanged. Paths are single command tokens, so spaces in
 paths are not supported by the v1 text parser.
 
-See [save-format.md](save-format.md) for the YAML v1 schema.
+`save-history` records typed setup and command lines from the current CLI
+session, excluding the `save-history` or `sh` command itself. Commands
+replayed from files are not recorded. See [save-format.md](save-format.md)
+for the YAML v1 schema.
 
 ## Command History Files
 
@@ -190,9 +197,11 @@ works inside history files and after the outer load command:
 b 0 gs;
 ```
 
-If a file parses as a YAML save, it is loaded as a save. If it looks like
-a v1 YAML save but is invalid, the CLI reports the save error instead of
-replaying it as history.
+If a YAML save contains `commands`, they are replayed after the saved game
+state loads. YAML `history` is archival and is not replayed. If a file
+parses as a YAML save, it is loaded as a save. If it looks like a v1 YAML
+save but is invalid, the CLI reports the save error instead of replaying
+it as history.
 
 ## Sample Session
 

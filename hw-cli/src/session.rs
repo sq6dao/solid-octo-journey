@@ -26,6 +26,8 @@ struct LoadedHistory {
     show_after: bool,
 }
 
+type TypedHistory = Vec<String>;
+
 pub fn run_stdio() -> io::Result<()> {
     let stdin = io::stdin();
     let stdout = io::stdout();
@@ -43,7 +45,8 @@ where
         "Enter pieces as gs, red medium, or yellow small, or load <path>."
     )?;
 
-    let Some(prompted) = prompt_game(&mut input, &mut output)? else {
+    let mut typed_history = TypedHistory::new();
+    let Some(prompted) = prompt_game(&mut input, &mut output, &mut typed_history)? else {
         return Ok(());
     };
     let mut game = prompted.game;
@@ -51,7 +54,10 @@ where
     writeln!(output, "Game started.")?;
     write!(output, "{}", render_turn_summary(&game))?;
     if let Some(history) = prompted.history {
-        if run_loaded_history(history, &mut game, &mut output, 1)? == CommandOutcome::Quit {
+        writeln!(output, "Running commands from {}.", history.path.display())?;
+        if run_loaded_history(history, &mut game, &mut output, 1, &typed_history)?
+            == CommandOutcome::Quit
+        {
             return Ok(());
         }
     } else {
@@ -67,7 +73,13 @@ where
             break;
         }
 
-        if run_command(line.trim(), &mut game, &mut output, 0)? == CommandOutcome::Quit {
+        let command = line.trim();
+        if !is_save_history_command(command) {
+            record_typed_history(&mut typed_history, command);
+        }
+
+        if run_command(command, &mut game, &mut output, 0, &typed_history)? == CommandOutcome::Quit
+        {
             break;
         }
     }
@@ -82,7 +94,7 @@ enum CommandOutcome {
 }
 
 enum LoadSource {
-    Save(Game),
+    Save(save::SavedGame),
     History(String),
 }
 
@@ -106,6 +118,7 @@ fn run_command<W: Write>(
     game: &mut Game,
     output: &mut W,
     load_depth: usize,
+    typed_history: &[String],
 ) -> io::Result<CommandOutcome> {
     if command.is_empty() {
         return Ok(CommandOutcome::Continue);
@@ -141,6 +154,23 @@ fn run_command<W: Write>(
                 }
                 Ok(CommandOutcome::Continue)
             }
+            ParsedCommand::SaveHistory(path) => {
+                let extras = save::SaveExtras {
+                    history: typed_history.to_vec(),
+                    commands: Vec::new(),
+                };
+                match save::save_file_with_extras(game, &extras, &path) {
+                    Ok(()) => {
+                        writeln!(output, "Saved history to {}.", path.display())?;
+                        render_after_semicolon(parsed.show_after, game, output)?;
+                    }
+                    Err(error) => {
+                        writeln!(output, "Error: {error}")?;
+                        render_after_semicolon(parsed.show_after, game, output)?;
+                    }
+                }
+                Ok(CommandOutcome::Continue)
+            }
             ParsedCommand::Load(path) => {
                 if load_depth >= MAX_LOAD_DEPTH {
                     writeln!(output, "Error: load nesting limit exceeded")?;
@@ -149,11 +179,26 @@ fn run_command<W: Write>(
 
                 match read_load_source(&path) {
                     Ok(LoadSource::Save(loaded)) => {
-                        *game = loaded;
+                        *game = loaded.game;
                         writeln!(output, "Loaded from {}.", path.display())?;
                         write!(output, "{}", render_turn_summary(game))?;
-                        render_after_semicolon(parsed.show_after, game, output)?;
-                        Ok(CommandOutcome::Continue)
+                        if loaded.commands.is_empty() {
+                            render_after_semicolon(parsed.show_after, game, output)?;
+                            Ok(CommandOutcome::Continue)
+                        } else {
+                            writeln!(output, "Running commands from {}.", path.display())?;
+                            run_loaded_history(
+                                LoadedHistory {
+                                    path,
+                                    commands: loaded.commands.join("\n"),
+                                    show_after: parsed.show_after,
+                                },
+                                game,
+                                output,
+                                load_depth + 1,
+                                typed_history,
+                            )
+                        }
                     }
                     Ok(LoadSource::History(history)) => {
                         writeln!(output, "Running commands from {}.", path.display())?;
@@ -166,6 +211,7 @@ fn run_command<W: Write>(
                             game,
                             output,
                             load_depth + 1,
+                            typed_history,
                         )
                     }
                     Err(error) => {
@@ -239,10 +285,25 @@ fn auto_end_turn_if_ready<W: Write>(game: &mut Game, output: &mut W) -> io::Resu
     Ok(())
 }
 
+fn record_typed_history(history: &mut TypedHistory, line: &str) {
+    let trimmed = line.trim();
+    if !trimmed.is_empty() {
+        history.push(trimmed.to_owned());
+    }
+}
+
+fn is_save_history_command(command: &str) -> bool {
+    command
+        .trim()
+        .split_whitespace()
+        .next()
+        .is_some_and(|token| matches!(token.to_ascii_lowercase().as_str(), "save-history" | "sh"))
+}
+
 fn read_load_source(path: &Path) -> Result<LoadSource, LoadSourceError> {
     let input = fs::read_to_string(path).map_err(LoadSourceError::Io)?;
-    match save::from_yaml(&input) {
-        Ok(game) => Ok(LoadSource::Save(game)),
+    match save::from_yaml_with_extras(&input) {
+        Ok(saved) => Ok(LoadSource::Save(saved)),
         Err(error) if looks_like_yaml_save(&input) => Err(LoadSourceError::Save(error)),
         Err(_) => Ok(LoadSource::History(input)),
     }
@@ -257,6 +318,7 @@ fn run_history<W: Write>(
     game: &mut Game,
     output: &mut W,
     load_depth: usize,
+    typed_history: &[String],
 ) -> io::Result<CommandOutcome> {
     for command in history_commands(history) {
         writeln!(
@@ -264,7 +326,7 @@ fn run_history<W: Write>(
             "{}> {command}",
             prompt_label(game.turn().current_player())
         )?;
-        if run_command(command, game, output, load_depth)? == CommandOutcome::Quit {
+        if run_command(command, game, output, load_depth, typed_history)? == CommandOutcome::Quit {
             return Ok(CommandOutcome::Quit);
         }
     }
@@ -277,8 +339,9 @@ fn run_loaded_history<W: Write>(
     game: &mut Game,
     output: &mut W,
     load_depth: usize,
+    typed_history: &[String],
 ) -> io::Result<CommandOutcome> {
-    match run_history(&history.commands, game, output, load_depth)? {
+    match run_history(&history.commands, game, output, load_depth, typed_history)? {
         CommandOutcome::Continue => {
             writeln!(output, "Finished commands from {}.", history.path.display())?;
             render_after_semicolon(history.show_after, game, output)?;
@@ -299,18 +362,22 @@ fn render_after_semicolon<W: Write>(
     Ok(())
 }
 
-fn prompt_game<R, W>(input: &mut R, output: &mut W) -> io::Result<Option<PromptedGame>>
+fn prompt_game<R, W>(
+    input: &mut R,
+    output: &mut W,
+    typed_history: &mut TypedHistory,
+) -> io::Result<Option<PromptedGame>>
 where
     R: BufRead,
     W: Write,
 {
     loop {
-        let player_one = match prompt_setup(input, output, Player::One)? {
+        let player_one = match prompt_setup(input, output, Player::One, typed_history)? {
             SetupPrompt::Setup(setup) => setup,
             SetupPrompt::Loaded(prompted) => return Ok(Some(prompted)),
             SetupPrompt::Eof => return Ok(None),
         };
-        let player_two = match prompt_setup(input, output, Player::Two)? {
+        let player_two = match prompt_setup(input, output, Player::Two, typed_history)? {
             SetupPrompt::Setup(setup) => setup,
             SetupPrompt::Loaded(prompted) => return Ok(Some(prompted)),
             SetupPrompt::Eof => return Ok(None),
@@ -341,7 +408,12 @@ enum SetupPrompt {
     Eof,
 }
 
-fn prompt_setup<R, W>(input: &mut R, output: &mut W, player: Player) -> io::Result<SetupPrompt>
+fn prompt_setup<R, W>(
+    input: &mut R,
+    output: &mut W,
+    player: Player,
+    typed_history: &mut TypedHistory,
+) -> io::Result<SetupPrompt>
 where
     R: BufRead,
     W: Write,
@@ -356,8 +428,10 @@ where
         if read_line(input, &mut stars)? == ReadLine::Eof {
             return Ok(SetupPrompt::Eof);
         }
+        let stars_line = stars.trim();
+        record_typed_history(typed_history, stars_line);
 
-        if let Some(parsed) = parse_setup_load(stars.trim()) {
+        if let Some(parsed) = parse_setup_load(stars_line) {
             match parsed {
                 Ok((path, show_after)) => {
                     if let Some(prompted) = load_game_from_setup(path, show_after, output)? {
@@ -374,8 +448,10 @@ where
         if read_line(input, &mut ship)? == ReadLine::Eof {
             return Ok(SetupPrompt::Eof);
         }
+        let ship_line = ship.trim();
+        record_typed_history(typed_history, ship_line);
 
-        match parse_setup(stars.trim(), ship.trim(), player) {
+        match parse_setup(stars_line, ship_line, player) {
             Ok(setup) => return Ok(SetupPrompt::Setup(setup)),
             Err(error) => writeln!(output, "Error: {}", error.message())?,
         }
@@ -402,27 +478,34 @@ fn load_game_from_setup<W: Write>(
     output: &mut W,
 ) -> io::Result<Option<PromptedGame>> {
     match read_load_source(&path) {
-        Ok(LoadSource::Save(game)) => {
+        Ok(LoadSource::Save(saved)) => {
             writeln!(output, "Loaded from {}.", path.display())?;
+            let history = if saved.commands.is_empty() {
+                None
+            } else {
+                Some(LoadedHistory {
+                    path,
+                    commands: saved.commands.join("\n"),
+                    show_after,
+                })
+            };
+            let show_after = if history.is_some() { false } else { show_after };
             Ok(Some(PromptedGame {
-                game,
-                history: None,
+                game: saved.game,
+                history,
                 show_after,
             }))
         }
         Ok(LoadSource::History(history)) => match game_from_history_setup(&history) {
-            Ok((game, commands)) => {
-                writeln!(output, "Running commands from {}.", path.display())?;
-                Ok(Some(PromptedGame {
-                    game,
-                    history: Some(LoadedHistory {
-                        path,
-                        commands,
-                        show_after,
-                    }),
-                    show_after: false,
-                }))
-            }
+            Ok((game, commands)) => Ok(Some(PromptedGame {
+                game,
+                history: Some(LoadedHistory {
+                    path,
+                    commands,
+                    show_after,
+                }),
+                show_after: false,
+            })),
             Err(error) => {
                 writeln!(output, "Error: {error}")?;
                 Ok(None)
@@ -780,6 +863,118 @@ q
         assert!(output.contains("Status: in progress"));
         assert!(yaml.contains("version: 1"));
         assert!(yaml.contains("systems:"));
+        assert!(!yaml.contains("history:"));
+        assert!(!yaml.contains("commands:"));
+    }
+
+    #[test]
+    fn save_history_command_writes_typed_history_only() {
+        let replay_path = temp_history_path("save_history_command_replay_fixture");
+        let save_path = temp_save_path("save_history_command_writes_typed_history_only");
+        fs::write(
+            &replay_path,
+            "show
+",
+        )
+        .expect("history fixture writes");
+        let script = format!(
+            "ys bm
+gs
+bl rl
+rm
+l {}
+bad;
+sh {}
+q
+",
+            replay_path.display(),
+            save_path.display()
+        );
+
+        let output = run_script(&script);
+        let yaml = fs::read_to_string(&save_path).expect("save file exists");
+        let _ = fs::remove_file(replay_path);
+        let _ = fs::remove_file(save_path);
+
+        assert!(output.contains("Saved history to "));
+        assert!(yaml.contains("history:"));
+        assert!(yaml.contains("- ys bm"));
+        assert!(yaml.contains("- gs"));
+        assert!(yaml.contains("- bl rl"));
+        assert!(yaml.contains("- rm"));
+        assert!(yaml.contains("- l "));
+        assert!(yaml.contains("- bad;"));
+        assert!(!yaml.contains("- show"));
+        assert!(!yaml.contains("commands:"));
+        assert!(!yaml.contains("sh "));
+    }
+
+    #[test]
+    fn load_yaml_replays_commands_but_not_history() {
+        let path = temp_save_path("load_yaml_replays_commands_but_not_history");
+        fs::write(
+            &path,
+            save::to_yaml_with_extras(
+                &Game::default(Player::One),
+                &save::SaveExtras {
+                    history: vec!["bad;".to_owned()],
+                    commands: vec!["show".to_owned()],
+                },
+            )
+            .expect("game serializes"),
+        )
+        .expect("save fixture writes");
+        let script = format!(
+            "ys bm
+gs
+bl rl
+rm
+l {}
+q
+",
+            path.display()
+        );
+
+        let output = run_script(&script);
+        let _ = fs::remove_file(path);
+
+        assert!(output.contains("Loaded from "));
+        assert!(output.contains("P1> show"));
+        assert!(output.contains("Status: in progress"));
+        assert!(!output.contains("unknown command `bad`"));
+    }
+
+    #[test]
+    fn load_yaml_with_history_only_does_not_replay() {
+        let path = temp_save_path("load_yaml_with_history_only_does_not_replay");
+        fs::write(
+            &path,
+            save::to_yaml_with_extras(
+                &Game::default(Player::One),
+                &save::SaveExtras {
+                    history: vec!["show".to_owned()],
+                    commands: Vec::new(),
+                },
+            )
+            .expect("game serializes"),
+        )
+        .expect("save fixture writes");
+        let script = format!(
+            "ys bm
+gs
+bl rl
+rm
+l {}
+q
+",
+            path.display()
+        );
+
+        let output = run_script(&script);
+        let _ = fs::remove_file(path);
+
+        assert!(output.contains("Loaded from "));
+        assert!(!output.contains("P1> show"));
     }
 
     #[test]

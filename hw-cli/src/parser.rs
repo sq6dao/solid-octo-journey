@@ -9,6 +9,7 @@ pub enum ParsedCommand {
     End,
     Quit,
     Save(PathBuf),
+    SaveHistory(PathBuf),
     Load(PathBuf),
     Action(Action),
 }
@@ -60,6 +61,9 @@ pub fn parse_command(line: &str, current_player: Player) -> Result<ParsedCommand
 
     match raw_tokens[0].to_ascii_lowercase().as_str() {
         "save" | "v" => return parse_file_command(&raw_tokens, ParsedCommand::Save),
+        "save-history" | "sh" => {
+            return parse_file_command(&raw_tokens, ParsedCommand::SaveHistory);
+        }
         "load" | "l" => return parse_file_command(&raw_tokens, ParsedCommand::Load),
         _ => {}
     }
@@ -377,6 +381,14 @@ mod tests {
             Ok(ParsedCommand::Save(PathBuf::from("GameOne.yaml")))
         );
         assert_eq!(
+            parse_command("save-history GameOne.yaml", Player::One),
+            Ok(ParsedCommand::SaveHistory(PathBuf::from("GameOne.yaml")))
+        );
+        assert_eq!(
+            parse_command("sh GameOne.yaml", Player::One),
+            Ok(ParsedCommand::SaveHistory(PathBuf::from("GameOne.yaml")))
+        );
+        assert_eq!(
             parse_command("load GameOne.yaml", Player::One),
             Ok(ParsedCommand::Load(PathBuf::from("GameOne.yaml")))
         );
@@ -429,6 +441,13 @@ mod tests {
             parse_input("v GameOne.yaml;", Player::One),
             Ok(ParsedInput {
                 command: ParsedCommand::Save(PathBuf::from("GameOne.yaml")),
+                show_after: true,
+            })
+        );
+        assert_eq!(
+            parse_input("sh GameOne.yaml;", Player::One),
+            Ok(ParsedInput {
+                command: ParsedCommand::SaveHistory(PathBuf::from("GameOne.yaml")),
                 show_after: true,
             })
         );
@@ -566,6 +585,7 @@ mod tests {
         assert!(parse_command("t 0 ys maybe 1", Player::One).is_err());
         assert!(parse_command("catastrophe 0 purple", Player::One).is_err());
         assert!(parse_command("save", Player::One).is_err());
+        assert!(parse_command("save-history", Player::One).is_err());
         assert!(parse_command("load game.yaml extra", Player::One).is_err());
         assert_eq!(
             parse_setup("ys", "gm", Player::One)

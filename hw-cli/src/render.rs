@@ -71,6 +71,7 @@ pub const fn render_help() -> &'static str {
   end | e
   quit | q
   save | v <path>
+  save-history | sh <path>
   load | l <path>  (YAML save or command history)
   build | b <system> <piece>
   travel | t <from> <piece> existing | x <to>
@@ -327,6 +328,7 @@ mod tests {
         let help = render_help();
 
         assert!(help.contains("show | s"));
+        assert!(help.contains("save-history | sh"));
         assert!(help.contains("build | b"));
         assert!(help.contains("trade | tr | x"));
         assert!(help.contains("catastrophe | c"));

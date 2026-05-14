@@ -43,6 +43,7 @@ After setup, use commands such as:
 show
 b 0 gs
 v game.yaml
+sh game-with-history.yaml
 l game.yaml
 l scenario.txt
 end
@@ -62,8 +63,9 @@ after errors:
 b 0 gs;
 ```
 
-Save files use hand-editable YAML. The same `load` command can also
-replay a plain text command history file with one CLI command per line.
-History files ignore empty lines and `#` comments. See
-[docs/cli.md](docs/cli.md) for the full command reference and
-[docs/save-format.md](docs/save-format.md) for the save format.
+Save files use hand-editable YAML. `save-history` or `sh` writes typed
+session history into the YAML metadata, while normal `save` stays compact.
+The same `load` command can also replay a plain text command history file
+with one CLI command per line. History files ignore empty lines and `#`
+comments. See [docs/cli.md](docs/cli.md) for the full command reference
+and [docs/save-format.md](docs/save-format.md) for the save format.
