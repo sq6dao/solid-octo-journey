@@ -18,6 +18,7 @@ pub fn legal_decisions(game: &Game) -> Vec<AiDecision> {
     push_travel_decisions(game, &mut decisions);
     push_trade_decisions(game, &mut decisions);
     push_sacrifice_decisions(game, &mut decisions);
+    push_invade_decisions(game, &mut decisions);
     decisions
 }
 
@@ -173,6 +174,35 @@ fn push_sacrifice_decisions(game: &Game, decisions: &mut Vec<AiDecision>) {
                     player,
                     system,
                     ship,
+                },
+            );
+        }
+    }
+}
+
+fn push_invade_decisions(game: &Game, decisions: &mut Vec<AiDecision>) {
+    if !paid_actions_allowed(game, ActionKind::Invade) {
+        return;
+    }
+
+    let player = game.turn().current_player();
+    let state = game.turn().state();
+
+    for (system_index, system_ref) in state.systems().iter().enumerate() {
+        let system = SystemId::new(system_index);
+        for target in system_ref
+            .ships()
+            .iter()
+            .copied()
+            .filter(|ship| ship.owner().is_some_and(|owner| owner != player))
+        {
+            push_legal_action(
+                game,
+                decisions,
+                Action::Invade {
+                    player,
+                    system,
+                    target,
                 },
             );
         }
@@ -376,6 +406,19 @@ mod tests {
         }));
     }
 
+    #[test]
+    fn invade_decisions_include_opponent_ships() {
+        let game = invade_game();
+        let decisions = legal_decisions(&game);
+
+        assert_all_actions_apply(&game, &decisions);
+        assert!(decisions.contains(&AiDecision::Action(Action::Invade {
+            player: Player::One,
+            system: SystemId::new(0),
+            target: Piece::owned(Color::Green, Size::Small, Player::Two),
+        })));
+    }
+
     fn assert_all_actions_apply(game: &Game, decisions: &[AiDecision]) {
         for decision in decisions {
             if let AiDecision::Action(action) = decision {
@@ -406,5 +449,35 @@ mod tests {
             Player::One,
         )
         .expect("game initializes")
+    }
+
+    fn invade_game() -> Game {
+        use hw_core::{Bank, GameState, StarSystem};
+
+        let state = GameState::new(
+            vec![
+                StarSystem::new(
+                    vec![Piece::new(Color::Red, Size::Small)],
+                    vec![
+                        Piece::owned(Color::Red, Size::Large, Player::One),
+                        Piece::owned(Color::Green, Size::Small, Player::Two),
+                    ],
+                )
+                .expect("system is valid"),
+                StarSystem::new(
+                    vec![
+                        Piece::new(Color::Blue, Size::Medium),
+                        Piece::new(Color::Yellow, Size::Large),
+                    ],
+                    vec![Piece::owned(Color::Blue, Size::Small, Player::Two)],
+                )
+                .expect("system is valid"),
+            ],
+            [SystemId::new(0), SystemId::new(1)],
+            Bank::new(),
+        )
+        .expect("state is valid");
+
+        Game::from_parts(TurnState::new(state, Player::One), GameStatus::InProgress)
     }
 }

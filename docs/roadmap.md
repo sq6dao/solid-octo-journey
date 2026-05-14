@@ -233,7 +233,7 @@ Initial action coverage:
 - [x] Travel owned ships to new one-star discoveries
 - [x] Trade owned ships to same-size bank ships of other colors
 - [x] Sacrifice owned ships
-- [ ] Invade opponent ships in shared systems
+- [x] Invade opponent ships in shared systems
 - [ ] Catastrophe for every overpopulated system/color
 
 #### AI-2: Baseline Strategies
