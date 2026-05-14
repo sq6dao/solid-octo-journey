@@ -1,0 +1,9 @@
+# Opening comment with blank lines and inline comments.
+ys bm
+
+gs # Player 1 ship
+bl rl
+rm
+
+b 0 gs # Auto-ends when no catastrophe is possible.
+show

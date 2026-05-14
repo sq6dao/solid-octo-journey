@@ -150,6 +150,7 @@ Playable game loop (engine-level, no UI yet)
 - [x] Full turn sequences
 - [x] Known game scenarios
 - [x] Edge cases (catastrophes, sacrifices)
+- [x] Golden CLI command sessions
 
 ---
 

@@ -7,7 +7,43 @@ struct GoldenCase {
     reject: &'static [&'static str],
 }
 
-const GOLDEN_CASES: &[GoldenCase] = &[];
+const GOLDEN_CASES: &[GoldenCase] = &[
+    GoldenCase {
+        name: "partial opening",
+        history: include_str!("../../tests/golden/partial_opening.hw"),
+        expect: &[
+            "Game started.",
+            "Status: in progress",
+            "Current player: Player 1",
+            "[0] homeworld Player 1",
+            "Ships: P1 gs",
+        ],
+        reject: &["Error:"],
+    },
+    GoldenCase {
+        name: "short terminal game",
+        history: include_str!("../../tests/golden/short_terminal_game.hw"),
+        expect: &[
+            "Game started.",
+            "Action applied.",
+            "Turn ended.",
+            "Status: finished, winner Player 2",
+        ],
+        reject: &["Error:"],
+    },
+    GoldenCase {
+        name: "comments and blanks",
+        history: include_str!("../../tests/golden/comments_and_blanks.hw"),
+        expect: &[
+            "Game started.",
+            "Action applied.",
+            "Turn ended.",
+            "Current player: Player 2",
+            "Ships: P1 gs, P1 gs",
+        ],
+        reject: &["Error:", "Opening comment"],
+    },
+];
 
 #[test]
 fn golden_sessions_match_expectations() {

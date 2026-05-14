@@ -6,11 +6,15 @@ assertions that define expected behavior.
 History fixtures live in `tests/golden/*.hw`. They use the same
 line-oriented command format as CLI history files: setup lines first,
 then commands, one per line. Empty lines and `#` comments are allowed.
-Do not put expected-output markers in history files.
+Do not put expected-output markers in history files. A fixture does not
+need to end with `q`; end-of-file ends the scripted session.
 
 Expectations live in `hw-cli/tests/golden_sessions.rs`. Each case imports
 a history file with `include_str!`, runs it through `hw_cli::session::run`,
 and checks expected or rejected output substrings in Rust.
+
+Current fixtures cover a partial opening, a short terminal game, and
+history hygiene with blank lines and comments.
 
 To add a case:
 
