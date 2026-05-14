@@ -21,7 +21,8 @@ current turn.
 Build actions are generated for bank-available current-player ships.
 Travel actions are generated for owned ships to existing systems and
 one-star new discoveries. Trade actions are generated from owned ships to
-same-size bank-available ships of other colors. The engine filter removes
-illegal candidates before they are returned.
+same-size bank-available ships of other colors. Sacrifice actions are
+generated for owned ships. The engine filter removes illegal candidates
+before they are returned.
 
 Other action families are being added incrementally as AI-1 matures.

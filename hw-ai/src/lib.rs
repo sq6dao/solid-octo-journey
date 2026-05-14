@@ -17,6 +17,7 @@ pub fn legal_decisions(game: &Game) -> Vec<AiDecision> {
     push_build_decisions(game, &mut decisions);
     push_travel_decisions(game, &mut decisions);
     push_trade_decisions(game, &mut decisions);
+    push_sacrifice_decisions(game, &mut decisions);
     decisions
 }
 
@@ -145,6 +146,35 @@ fn push_trade_decisions(game: &Game, decisions: &mut Vec<AiDecision>) {
                     },
                 );
             }
+        }
+    }
+}
+
+fn push_sacrifice_decisions(game: &Game, decisions: &mut Vec<AiDecision>) {
+    if !paid_actions_allowed(game, ActionKind::Sacrifice) {
+        return;
+    }
+
+    let player = game.turn().current_player();
+    let state = game.turn().state();
+
+    for (system_index, system_ref) in state.systems().iter().enumerate() {
+        let system = SystemId::new(system_index);
+        for ship in system_ref
+            .ships()
+            .iter()
+            .copied()
+            .filter(|ship| ship.is_owned_by(player))
+        {
+            push_legal_action(
+                game,
+                decisions,
+                Action::Sacrifice {
+                    player,
+                    system,
+                    ship,
+                },
+            );
         }
     }
 }
@@ -303,6 +333,47 @@ mod tests {
                 assert_ne!(from.color(), to.color());
             }
         }
+    }
+
+    #[test]
+    fn sacrifice_decisions_include_owned_ships() {
+        let game = Game::default(Player::One);
+        let decisions = legal_decisions(&game);
+
+        assert_all_actions_apply(&game, &decisions);
+        assert!(decisions.contains(&AiDecision::Action(Action::Sacrifice {
+            player: Player::One,
+            system: SystemId::new(0),
+            ship: Piece::owned(Color::Green, Size::Small, Player::One),
+        })));
+    }
+
+    #[test]
+    fn paid_actions_are_absent_without_budget() {
+        let game = Game::default(Player::One);
+        let turn = TurnState::from_parts(game.turn().state().clone(), Player::One, 0, None);
+        let game = Game::from_parts(turn, GameStatus::InProgress);
+
+        assert_eq!(legal_decisions(&game), vec![AiDecision::EndTurn]);
+    }
+
+    #[test]
+    fn paid_actions_respect_sacrifice_action_kind_restrictions() {
+        let game = Game::default(Player::One);
+        let turn = TurnState::from_parts(
+            game.turn().state().clone(),
+            Player::One,
+            2,
+            Some(ActionKind::Build),
+        );
+        let game = Game::from_parts(turn, GameStatus::InProgress);
+
+        let decisions = legal_decisions(&game);
+        assert!(!decisions.is_empty());
+        assert!(decisions.iter().all(|decision| match decision {
+            AiDecision::Action(action) => action.kind() == ActionKind::Build,
+            AiDecision::EndTurn => false,
+        }));
     }
 
     fn assert_all_actions_apply(game: &Game, decisions: &[AiDecision]) {
