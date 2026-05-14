@@ -24,8 +24,9 @@
     construction
 - `StarSystem` exposes deterministic owner presence checks through
   `has_presence` and `owners_present`.
-- `GameState` requires exactly one distinct homeworld per player, but
-  homeworld loss checks are deferred.
+- `GameState` requires exactly one distinct homeworld per player. Core
+  construction still allows empty homeworld states, while engine game
+  flow detects homeworld loss at turn end.
 - `hw-engine` currently defines typed actions and non-mutating validation
   for Build, Move, Trade, Sacrifice, Invade, and Catastrophe. Move
   targets can be existing systems or newly discovered systems. Discovery
@@ -34,7 +35,9 @@
   Invade requires a same-size-or-larger acting-player ship in the target
   system.
 - `hw-engine` exposes pure `apply_action` state transitions for Build,
-  Move, Trade, Invade, Sacrifice, and Catastrophe.
+  Move, Trade, Invade, Sacrifice, and Catastrophe. It also provides
+  `TurnState` for turn sequencing and `Game` for initialization,
+  turn-end win detection, and terminal-state enforcement.
 - `hw-cli` is still a placeholder.
 - The workspace test suite currently covers core piece, bank, and star
   system invariants, `GameState` container behavior, and initial action
@@ -124,9 +127,9 @@ Encode all legal moves and transitions.
 ### Goal
 Playable game loop (engine-level, no UI yet)
 
-- [ ] Game initialization
-- [ ] Win condition detection
-- [ ] Game termination
+- [x] Game initialization
+- [x] Win condition detection
+- [x] Game termination
 
 ---
 

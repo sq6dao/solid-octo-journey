@@ -601,6 +601,10 @@ If the selected non-homeworld system has no stars after the catastrophe,
 prune it even when ships remain, returning those remaining ships to the
 bank as well.
 
+If the selected homeworld system has no stars after the catastrophe,
+retain the homeworld system but return all remaining ships there to the
+bank.
+
 **Context**
 Catastrophe validation already checks overpopulation in one system. The
 transition must not cascade into other systems or auto-resolve unrelated
@@ -614,6 +618,7 @@ overpopulation.
 **Consequences**
 + Catastrophe execution is explicit and single-system scoped
 + Starless non-homeworld cleanup matches the board model
++ Starless homeworlds cannot retain ships before loss detection
 - Automatic catastrophe resolution remains out of scope
 
 ---
@@ -652,9 +657,41 @@ state.
 
 ---
 
+## 2026-05-14 – Engine Game Flow
+
+**Decision**
+Add `Game` in `hw-engine` as the engine-level game loop wrapper over
+`TurnState`.
+
+`Game::new` builds a game from explicit player homeworld setup,
+consuming the starting stars and ships from a fresh bank. `Game::default`
+provides one deterministic valid setup for tests and future CLI work.
+
+Loss is checked only by `Game::end_turn`. A player loses when they have
+no ships at their own homeworld; the other player wins. If both players
+have lost at the same turn end, the game is a draw. Terminal games reject
+further actions and turn ending.
+
+**Context**
+Phase 3 calls for engine-level initialization, win detection, and game
+termination without adding CLI parsing or rendering. `TurnState` already
+handles action budgets and player switching.
+
+**Alternatives**
+- Put initialization and terminal status directly in `GameState`
+- Detect loss immediately after every action
+- Provide only a fixed default setup
+
+**Consequences**
++ Engine callers now have one API for playable game flow
++ Core remains a reusable board-state model
++ Loss timing is explicit and testable at turn boundaries
+- The CLI still needs separate command parsing and rendering
+
+---
+
 ## Future Decisions (To Be Made)
 
-- Homeworld loss and win-condition validation
 - AI architecture
 - Serialization format (JSON vs binary)
 - Networking approach
