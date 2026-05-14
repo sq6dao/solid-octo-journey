@@ -156,9 +156,9 @@ Minimal playable interface
 - [x] Action state transitions
 
 ### Integration Tests
-- [ ] Full turn sequences
-- [ ] Known game scenarios
-- [ ] Edge cases (catastrophes, sacrifices)
+- [x] Full turn sequences
+- [x] Known game scenarios
+- [x] Edge cases (catastrophes, sacrifices)
 
 ---
 
