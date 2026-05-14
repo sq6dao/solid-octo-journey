@@ -61,6 +61,8 @@ Use those IDs in action commands.
 | Show state | `s` | `show` |
 | End turn | `e` | `end` |
 | Quit | `q` | `quit` |
+| Save | `v` | `save <path>` |
+| Load | `l` | `load <path>` |
 | Build | `b` | `build <system> <piece>` |
 | Travel existing | `t` | `travel <from> <piece> existing <to>` |
 | Travel existing | `t` | `travel <from> <piece> x <to>` |
@@ -78,6 +80,8 @@ b 0 gs
 t 0 ys x 1
 t 0 ys n rm bl
 x 0 bs rs
+v game.yaml
+l game.yaml
 s 0 gm
 i 1 gs
 c 1 r
@@ -119,6 +123,25 @@ show; q  # rejected
 
 `show;` still prints the state only once.
 
+## Save And Load
+
+Use `save <path>` or `v <path>` to write a YAML save file. Use
+`load <path>` or `l <path>` to replace the current game with a saved
+game.
+
+```text
+v game.yaml
+l game.yaml
+l game.yaml;
+```
+
+Save files store the board, bank, turn state, and game status. The loader
+validates the file before replacing the current game; failed loads leave
+the current game unchanged. Paths are single command tokens, so spaces in
+paths are not supported by the v1 text parser.
+
+See [save-format.md](save-format.md) for the YAML v1 schema.
+
 ## Sample Session
 
 ```text
@@ -129,6 +152,7 @@ Player 2 stars> bl rl
 Player 2 ship> rm
 P1> show
 P1> b 0 gs;
+P1> v game.yaml
 P1> e
 P2> q
 ```

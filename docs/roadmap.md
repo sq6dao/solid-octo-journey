@@ -170,12 +170,13 @@ Minimal playable interface
 ### Goal
 Stable save/load support and state interchange.
 
-- [ ] Add serialization support for public core and engine state types
-- [ ] Serialize and deserialize `Game`, `GameState`, `StarSystem`,
-  `Piece`, `Bank`, actions, turn state, and game status
-- [ ] Define a v1 save file format, likely JSON
-- [ ] Add save/load support to the CLI
-- [ ] Add round-trip tests and compatibility fixtures
+- [x] Add YAML serialization support through stable save DTOs
+- [x] Serialize and deserialize game state, systems, pieces, bank counts,
+  turn state, and game status
+- [x] Define a v1 YAML save file format
+- [x] Add save/load support to the CLI
+- [x] Add round-trip tests and invalid-file coverage
+- [ ] Action/history serialization
 
 ---
 

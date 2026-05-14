@@ -37,6 +37,8 @@ After setup, use commands such as:
 ```text
 show
 b 0 gs
+v game.yaml
+l game.yaml
 end
 s
 x 0 bs rs
@@ -50,4 +52,6 @@ Append `;` to a successful command to print the game state afterward:
 b 0 gs;
 ```
 
-See [docs/cli.md](docs/cli.md) for the full command reference.
+Save files use hand-editable YAML. See [docs/cli.md](docs/cli.md) for
+the full command reference and [docs/save-format.md](docs/save-format.md)
+for the save format.
