@@ -12,6 +12,12 @@ pub enum ParsedCommand {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedInput {
+    pub command: ParsedCommand,
+    pub show_after: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ParseError {
     message: String,
 }
@@ -36,6 +42,14 @@ impl fmt::Display for ParseError {
 
 impl std::error::Error for ParseError {}
 
+pub fn parse_input(line: &str, current_player: Player) -> Result<ParsedInput, ParseError> {
+    let (command_line, show_after) = strip_show_suffix(line)?;
+    Ok(ParsedInput {
+        command: parse_command(command_line, current_player)?,
+        show_after,
+    })
+}
+
 pub fn parse_command(line: &str, current_player: Player) -> Result<ParsedCommand, ParseError> {
     let tokens = tokenize(line);
     if tokens.is_empty() {
@@ -55,6 +69,17 @@ pub fn parse_command(line: &str, current_player: Player) -> Result<ParsedCommand
         "invade" | "i" => parse_invade(&tokens, current_player),
         "catastrophe" | "c" => parse_catastrophe(&tokens),
         other => Err(ParseError::new(format!("unknown command `{other}`"))),
+    }
+}
+
+fn strip_show_suffix(line: &str) -> Result<(&str, bool), ParseError> {
+    let trimmed = line.trim();
+    match trimmed.find(';') {
+        Some(index) if index == trimmed.len() - 1 => Ok((&trimmed[..index], true)),
+        Some(_) => Err(ParseError::new(
+            "semicolon is only allowed at the end of a command",
+        )),
+        None => Ok((trimmed, false)),
     }
 }
 
@@ -314,6 +339,53 @@ mod tests {
         assert_eq!(parse_command("e", Player::One), Ok(ParsedCommand::End));
         assert_eq!(parse_command("quit", Player::One), Ok(ParsedCommand::Quit));
         assert_eq!(parse_command("q", Player::One), Ok(ParsedCommand::Quit));
+    }
+
+    #[test]
+    fn parses_trailing_semicolon_as_show_shortcut() {
+        assert_eq!(
+            parse_input("b 0 gs;", Player::One),
+            Ok(ParsedInput {
+                command: ParsedCommand::Action(Action::Build {
+                    player: Player::One,
+                    system: SystemId::new(0),
+                    ship: Piece::owned(Color::Green, Size::Small, Player::One),
+                }),
+                show_after: true,
+            })
+        );
+        assert_eq!(
+            parse_input("show;", Player::One),
+            Ok(ParsedInput {
+                command: ParsedCommand::Show,
+                show_after: true,
+            })
+        );
+        assert_eq!(
+            parse_input("show", Player::One),
+            Ok(ParsedInput {
+                command: ParsedCommand::Show,
+                show_after: false,
+            })
+        );
+        assert_eq!(
+            parse_input("t 0 ys x 1;", Player::One),
+            Ok(ParsedInput {
+                command: ParsedCommand::Action(Action::Travel {
+                    player: Player::One,
+                    from: SystemId::new(0),
+                    ship: Piece::owned(Color::Yellow, Size::Small, Player::One),
+                    target: TravelTarget::Existing(SystemId::new(1)),
+                }),
+                show_after: true,
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_semicolons_that_do_not_finish_the_command() {
+        assert!(parse_input("show; show", Player::One).is_err());
+        assert!(parse_input("show;;", Player::One).is_err());
     }
 
     #[test]

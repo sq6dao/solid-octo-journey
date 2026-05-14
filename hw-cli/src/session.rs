@@ -4,7 +4,7 @@ use hw_core::Player;
 use hw_engine::{Game, HomeworldSetup};
 
 use crate::{
-    parser::{ParsedCommand, parse_command, parse_setup},
+    parser::{ParsedCommand, parse_input, parse_setup},
     render::{render_game, render_help, render_turn_summary},
 };
 
@@ -43,33 +43,51 @@ where
             continue;
         }
 
-        match parse_command(command, game.turn().current_player()) {
-            Ok(ParsedCommand::Help) => write!(output, "{}", render_help())?,
-            Ok(ParsedCommand::Show) => write!(output, "{}", render_game(&game))?,
-            Ok(ParsedCommand::Quit) => {
-                writeln!(output, "Goodbye.")?;
-                break;
-            }
-            Ok(ParsedCommand::End) => match game.end_turn() {
-                Ok(next) => {
-                    game = next;
-                    writeln!(output, "Turn ended.")?;
-                    write!(output, "{}", render_turn_summary(&game))?;
+        match parse_input(command, game.turn().current_player()) {
+            Ok(parsed) => match parsed.command {
+                ParsedCommand::Help => {
+                    write!(output, "{}", render_help())?;
+                    render_after_semicolon(parsed.show_after, &game, &mut output)?;
                 }
-                Err(error) => writeln!(output, "Error: {}", format_game_error(&error))?,
-            },
-            Ok(ParsedCommand::Action(action)) => match game.apply_action(&action) {
-                Ok(next) => {
-                    game = next;
-                    writeln!(output, "Action applied.")?;
-                    write!(output, "{}", render_turn_summary(&game))?;
+                ParsedCommand::Show => write!(output, "{}", render_game(&game))?,
+                ParsedCommand::Quit => {
+                    writeln!(output, "Goodbye.")?;
+                    break;
                 }
-                Err(error) => writeln!(output, "Error: {}", format_game_error(&error))?,
+                ParsedCommand::End => match game.end_turn() {
+                    Ok(next) => {
+                        game = next;
+                        writeln!(output, "Turn ended.")?;
+                        write!(output, "{}", render_turn_summary(&game))?;
+                        render_after_semicolon(parsed.show_after, &game, &mut output)?;
+                    }
+                    Err(error) => writeln!(output, "Error: {}", format_game_error(&error))?,
+                },
+                ParsedCommand::Action(action) => match game.apply_action(&action) {
+                    Ok(next) => {
+                        game = next;
+                        writeln!(output, "Action applied.")?;
+                        write!(output, "{}", render_turn_summary(&game))?;
+                        render_after_semicolon(parsed.show_after, &game, &mut output)?;
+                    }
+                    Err(error) => writeln!(output, "Error: {}", format_game_error(&error))?,
+                },
             },
             Err(error) => writeln!(output, "Error: {}", error.message())?,
         }
     }
 
+    Ok(())
+}
+
+fn render_after_semicolon<W: Write>(
+    show_after: bool,
+    game: &Game,
+    output: &mut W,
+) -> io::Result<()> {
+    if show_after {
+        write!(output, "{}", render_game(game))?;
+    }
     Ok(())
 }
 
@@ -250,6 +268,54 @@ q
         );
 
         assert!(output.contains("Status: finished, winner Player 2"));
+    }
+
+    #[test]
+    fn semicolon_prints_state_after_a_successful_command() {
+        let output = run_script(
+            "ys
+gs
+bl
+rm
+b 0 gs;
+q
+",
+        );
+
+        assert!(output.contains("Action applied."));
+        assert!(output.contains("Status: in progress"));
+        assert!(output.contains("Ships: P1 gs, P1 gs"));
+    }
+
+    #[test]
+    fn show_with_semicolon_only_prints_state_once() {
+        let output = run_script(
+            "ys
+gs
+bl
+rm
+show;
+q
+",
+        );
+
+        assert_eq!(output.matches("Status: in progress").count(), 1);
+    }
+
+    #[test]
+    fn semicolon_does_not_print_state_after_an_error() {
+        let output = run_script(
+            "ys
+gs
+bl
+rm
+bad;
+q
+",
+        );
+
+        assert!(output.contains("Error: unknown command"));
+        assert_eq!(output.matches("Status: in progress").count(), 0);
     }
 
     fn run_script(input: &str) -> String {
