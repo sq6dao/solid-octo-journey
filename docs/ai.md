@@ -29,3 +29,16 @@ pairs even when no paid action budget remains.
 The engine filter removes illegal candidates before they are returned.
 Equivalent decisions are deduplicated while preserving deterministic
 order.
+
+Strategy implementations use the same legal-decision stream:
+
+```rust
+use hw_ai::{FirstLegalStrategy, Strategy};
+use hw_engine::Game;
+
+let game = Game::default(hw_core::Player::One);
+let decision = FirstLegalStrategy.choose(&game);
+```
+
+`FirstLegalStrategy` returns the first generated legal decision, or
+`None` for terminal games and other positions with no legal decisions.

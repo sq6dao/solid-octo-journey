@@ -14,7 +14,7 @@ A modular Rust engine for a two-player Homeworlds-style game.
 - Strongly typed core model for pieces, banks, systems, and players.
 - Deterministic engine game loop with turns, sacrifice budgets, automatic
   turn end when safe, and terminal game status.
-- Deterministic AI legal-decision generation.
+- Deterministic AI legal-decision generation and first-legal strategy.
 - Hand-editable YAML save/load support.
 - Text hot-seat CLI with short commands, command replay files, session
   history saves, and interactive arrow-key editing.

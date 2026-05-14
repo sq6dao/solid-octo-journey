@@ -7,6 +7,19 @@ pub enum AiDecision {
     EndTurn,
 }
 
+pub trait Strategy {
+    fn choose(&self, game: &Game) -> Option<AiDecision>;
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct FirstLegalStrategy;
+
+impl Strategy for FirstLegalStrategy {
+    fn choose(&self, game: &Game) -> Option<AiDecision> {
+        legal_decisions(game).into_iter().next()
+    }
+}
+
 pub fn legal_decisions(game: &Game) -> Vec<AiDecision> {
     if game.status() != GameStatus::InProgress {
         return Vec::new();
@@ -254,6 +267,26 @@ mod tests {
         );
 
         assert_eq!(legal_decisions(&game), Vec::new());
+    }
+
+    #[test]
+    fn first_legal_strategy_returns_first_generated_decision() {
+        let game = Game::default(Player::One);
+
+        assert_eq!(
+            FirstLegalStrategy.choose(&game),
+            legal_decisions(&game).into_iter().next()
+        );
+    }
+
+    #[test]
+    fn first_legal_strategy_returns_none_for_terminal_games() {
+        let game = Game::from_parts(
+            Game::default(Player::One).turn().clone(),
+            GameStatus::Finished(GameOutcome::Winner(Player::One)),
+        );
+
+        assert_eq!(FirstLegalStrategy.choose(&game), None);
     }
 
     #[test]

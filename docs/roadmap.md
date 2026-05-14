@@ -237,7 +237,7 @@ Initial action coverage:
 
 #### AI-2: Baseline Strategies
 
-- [ ] Add `FirstLegalStrategy`
+- [x] Add `FirstLegalStrategy`
 - [ ] Add a simple deterministic priority strategy
 - [ ] Prefer immediate wins, then necessary catastrophes, then paid
   actions, then legal turn end
