@@ -39,6 +39,16 @@ impl TurnState {
     }
 
     pub fn apply_action(&self, action: &Action) -> Result<Self, TurnError> {
+        if matches!(action, Action::Catastrophe { .. }) {
+            let state = crate::apply_action(&self.state, action).map_err(TurnError::InvalidAction)?;
+
+            return Ok(Self {
+                state,
+                current_player: self.current_player,
+                remaining_actions: self.remaining_actions,
+            });
+        }
+
         if let Some(player) = action_player(action) {
             if player != self.current_player {
                 return Err(TurnError::WrongPlayer {
@@ -205,6 +215,72 @@ mod tests {
         );
     }
 
+    #[test]
+    fn catastrophe_actions_do_not_consume_budget() {
+        let turn = TurnState::new(state_with_catastrophe(), Player::One);
+        let action = Action::Catastrophe {
+            system: SystemId::new(0),
+            color: Color::Red,
+        };
+
+        let next = turn.apply_action(&action).expect("catastrophe applies");
+
+        assert_eq!(next.current_player(), Player::One);
+        assert_eq!(next.remaining_actions(), 1);
+        assert!(
+            next.state()
+                .system(SystemId::new(0))
+                .expect("system exists")
+                .stars()
+                .iter()
+                .all(|piece| piece.color() != Color::Red)
+        );
+        assert!(
+            next.state()
+                .system(SystemId::new(0))
+                .expect("system exists")
+                .ships()
+                .iter()
+                .all(|piece| piece.color() != Color::Red)
+        );
+    }
+
+    #[test]
+    fn catastrophe_actions_can_apply_after_budget_is_spent() {
+        let turn = TurnState::new(state_with_catastrophe(), Player::One);
+        let build = build_action(
+            Player::One,
+            owned_ship(Player::One, Color::Green, Size::Small),
+        );
+        let catastrophe = Action::Catastrophe {
+            system: SystemId::new(0),
+            color: Color::Red,
+        };
+        let spent = turn.apply_action(&build).expect("build applies");
+
+        let next = spent
+            .apply_action(&catastrophe)
+            .expect("catastrophe applies");
+
+        assert_eq!(next.current_player(), Player::One);
+        assert_eq!(next.remaining_actions(), 0);
+    }
+
+    #[test]
+    fn end_turn_allows_unresolved_catastrophes() {
+        let turn = TurnState::new(state_with_catastrophe(), Player::One);
+        let action = build_action(
+            Player::One,
+            owned_ship(Player::One, Color::Green, Size::Small),
+        );
+        let spent = turn.apply_action(&action).expect("action applies");
+
+        let next = spent.end_turn().expect("turn ends");
+
+        assert_eq!(next.current_player(), Player::Two);
+        assert_eq!(next.remaining_actions(), 1);
+    }
+
     fn build_action(player: Player, ship: Piece) -> Action {
         Action::Build {
             player,
@@ -215,6 +291,33 @@ mod tests {
 
     fn valid_state() -> GameState {
         state_with_bank(Bank::new())
+    }
+
+    fn state_with_catastrophe() -> GameState {
+        GameState::new(
+            vec![
+                StarSystem::new(
+                    vec![
+                        Piece::new(Color::Red, Size::Small),
+                        Piece::new(Color::Red, Size::Medium),
+                    ],
+                    vec![
+                        owned_ship(Player::One, Color::Red, Size::Small),
+                        owned_ship(Player::Two, Color::Red, Size::Large),
+                        owned_ship(Player::One, Color::Green, Size::Small),
+                    ],
+                )
+                .expect("system is valid"),
+                StarSystem::new(
+                    vec![Piece::new(Color::Green, Size::Medium)],
+                    vec![owned_ship(Player::Two, Color::Yellow, Size::Small)],
+                )
+                .expect("system is valid"),
+            ],
+            [SystemId::new(0), SystemId::new(1)],
+            Bank::new(),
+        )
+        .expect("state is valid")
     }
 
     fn state_with_bank(bank: Bank) -> GameState {
