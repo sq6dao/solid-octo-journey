@@ -43,11 +43,13 @@ pub(super) fn require_action_power(
         .system(system)
         .ok_or(ActionError::UnknownSystem { system })?;
 
-    if system_ref
+    let has_ship_power = system_ref
         .ships()
         .iter()
-        .any(|ship| ship.is_owned_by(player) && ship.color() == color)
-    {
+        .any(|ship| ship.is_owned_by(player) && ship.color() == color);
+    let has_star_power = system_ref.stars().iter().any(|star| star.color() == color);
+
+    if has_ship_power || has_star_power {
         Ok(())
     } else {
         Err(ActionError::MissingActionPower {

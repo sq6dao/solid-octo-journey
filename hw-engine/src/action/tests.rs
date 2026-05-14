@@ -142,10 +142,13 @@ fn build_validation_rejects_an_unavailable_bank_piece() {
 
 #[test]
 fn build_validation_rejects_missing_green_power() {
-    let state = state_with_primary_ships(vec![
-        owned_ship(Player::One, Color::Blue, Size::Small),
-        owned_ship(Player::One, Color::Yellow, Size::Small),
-    ]);
+    let state = state_with_primary_stars_and_ships(
+        vec![Piece::new(Color::Yellow, Size::Small)],
+        vec![
+            owned_ship(Player::One, Color::Blue, Size::Small),
+            owned_ship(Player::One, Color::Yellow, Size::Small),
+        ],
+    );
     let action = build_action(Player::One, SystemId::new(0), Color::Green, Size::Small);
 
     assert_eq!(
@@ -156,6 +159,17 @@ fn build_validation_rejects_missing_green_power() {
             color: Color::Green,
         })
     );
+}
+
+#[test]
+fn build_validation_accepts_green_star_power() {
+    let state = state_with_primary_stars_and_ships(
+        vec![Piece::new(Color::Green, Size::Small)],
+        vec![owned_ship(Player::One, Color::Blue, Size::Small)],
+    );
+    let action = build_action(Player::One, SystemId::new(0), Color::Yellow, Size::Small);
+
+    assert_eq!(validate_action(&state, &action), Ok(()));
 }
 
 #[test]
@@ -291,10 +305,13 @@ fn travel_validation_rejects_a_missing_source_ship() {
 
 #[test]
 fn travel_validation_rejects_missing_yellow_power() {
-    let state = state_with_primary_ships(vec![
-        owned_ship(Player::One, Color::Blue, Size::Small),
-        owned_ship(Player::One, Color::Green, Size::Small),
-    ]);
+    let state = state_with_primary_stars_and_ships(
+        vec![Piece::new(Color::Green, Size::Small)],
+        vec![
+            owned_ship(Player::One, Color::Blue, Size::Small),
+            owned_ship(Player::One, Color::Green, Size::Small),
+        ],
+    );
     let action = travel_action(
         Player::One,
         SystemId::new(0),
@@ -311,6 +328,24 @@ fn travel_validation_rejects_missing_yellow_power() {
             color: Color::Yellow,
         })
     );
+}
+
+#[test]
+fn travel_validation_accepts_yellow_star_power() {
+    let state = state_with_primary_stars_and_ships(
+        vec![Piece::new(Color::Yellow, Size::Small)],
+        vec![owned_ship(Player::One, Color::Blue, Size::Small)],
+    );
+    let action = Action::Travel {
+        player: Player::One,
+        from: SystemId::new(0),
+        ship: owned_ship(Player::One, Color::Blue, Size::Small),
+        target: TravelTarget::New {
+            stars: vec![Piece::new(Color::Red, Size::Medium)],
+        },
+    };
+
+    assert_eq!(validate_action(&state, &action), Ok(()));
 }
 
 #[test]
@@ -403,10 +438,13 @@ fn trade_validation_rejects_an_unavailable_bank_piece() {
 
 #[test]
 fn trade_validation_rejects_missing_blue_power() {
-    let state = state_with_primary_ships(vec![
-        owned_ship(Player::One, Color::Green, Size::Small),
-        owned_ship(Player::One, Color::Yellow, Size::Small),
-    ]);
+    let state = state_with_primary_stars_and_ships(
+        vec![Piece::new(Color::Yellow, Size::Small)],
+        vec![
+            owned_ship(Player::One, Color::Green, Size::Small),
+            owned_ship(Player::One, Color::Yellow, Size::Small),
+        ],
+    );
     let from = owned_ship(Player::One, Color::Green, Size::Small);
     let action = Action::Trade {
         player: Player::One,
@@ -423,6 +461,22 @@ fn trade_validation_rejects_missing_blue_power() {
             color: Color::Blue,
         })
     );
+}
+
+#[test]
+fn trade_validation_accepts_blue_star_power() {
+    let state = state_with_primary_stars_and_ships(
+        vec![Piece::new(Color::Blue, Size::Small)],
+        vec![owned_ship(Player::One, Color::Green, Size::Small)],
+    );
+    let action = Action::Trade {
+        player: Player::One,
+        system: SystemId::new(0),
+        from: owned_ship(Player::One, Color::Green, Size::Small),
+        to: owned_ship(Player::One, Color::Yellow, Size::Small),
+    };
+
+    assert_eq!(validate_action(&state, &action), Ok(()));
 }
 
 #[test]
@@ -553,10 +607,13 @@ fn travel_validation_rejects_duplicate_discovery_stars_exceeding_the_bank() {
 
 #[test]
 fn travel_validation_rejects_missing_yellow_power_for_a_new_system_target() {
-    let state = state_with_primary_ships(vec![
-        owned_ship(Player::One, Color::Blue, Size::Small),
-        owned_ship(Player::One, Color::Green, Size::Small),
-    ]);
+    let state = state_with_primary_stars_and_ships(
+        vec![Piece::new(Color::Green, Size::Small)],
+        vec![
+            owned_ship(Player::One, Color::Blue, Size::Small),
+            owned_ship(Player::One, Color::Green, Size::Small),
+        ],
+    );
     let action = Action::Travel {
         player: Player::One,
         from: SystemId::new(0),
@@ -880,7 +937,15 @@ fn invade_validation_rejects_a_target_owned_by_the_acting_player() {
 
 #[test]
 fn invade_validation_rejects_missing_red_power() {
-    let state = valid_state();
+    let state = state_with_primary_stars_and_ships(
+        vec![Piece::new(Color::Yellow, Size::Small)],
+        vec![
+            owned_ship(Player::One, Color::Blue, Size::Small),
+            owned_ship(Player::One, Color::Green, Size::Small),
+            owned_ship(Player::One, Color::Yellow, Size::Small),
+            owned_ship(Player::Two, Color::Red, Size::Medium),
+        ],
+    );
     let target = owned_ship(Player::Two, Color::Red, Size::Medium);
     let invade = Action::Invade {
         player: Player::One,
@@ -896,6 +961,22 @@ fn invade_validation_rejects_missing_red_power() {
             color: Color::Red,
         })
     );
+}
+
+#[test]
+fn invade_validation_accepts_red_star_power() {
+    let target = owned_ship(Player::Two, Color::Red, Size::Medium);
+    let state = state_with_primary_stars_and_ships(
+        vec![Piece::new(Color::Red, Size::Small)],
+        vec![owned_ship(Player::One, Color::Blue, Size::Medium), target],
+    );
+    let invade = Action::Invade {
+        player: Player::One,
+        system: SystemId::new(0),
+        target,
+    };
+
+    assert_eq!(validate_action(&state, &invade), Ok(()));
 }
 
 #[test]
@@ -966,15 +1047,30 @@ fn state_with_bank(bank: Bank) -> GameState {
 }
 
 fn state_with_primary_ships(ships: Vec<Piece>) -> GameState {
-    state_with_primary_ships_and_bank(Bank::new(), ships)
+    state_with_primary_stars_and_ships(vec![Piece::new(Color::Yellow, Size::Small)], ships)
 }
 
 fn state_with_primary_ships_and_bank(bank: Bank, ships: Vec<Piece>) -> GameState {
+    state_with_primary_stars_ships_and_bank(
+        bank,
+        vec![Piece::new(Color::Yellow, Size::Small)],
+        ships,
+    )
+}
+
+fn state_with_primary_stars_and_ships(stars: Vec<Piece>, ships: Vec<Piece>) -> GameState {
+    state_with_primary_stars_ships_and_bank(Bank::new(), stars, ships)
+}
+
+fn state_with_primary_stars_ships_and_bank(
+    bank: Bank,
+    stars: Vec<Piece>,
+    ships: Vec<Piece>,
+) -> GameState {
     state_with_bank_and_systems(
         bank,
         vec![
-            StarSystem::new(vec![Piece::new(Color::Yellow, Size::Small)], ships)
-                .expect("system is valid"),
+            StarSystem::new(stars, ships).expect("system is valid"),
             secondary_system(),
         ],
     )
