@@ -22,6 +22,36 @@ use crate::{
 };
 
 const MAX_LOAD_DEPTH: usize = 16;
+const COMMAND_NAMES: &[&str] = &[
+    "help",
+    "show",
+    "end",
+    "quit",
+    "save",
+    "save-history",
+    "load",
+    "build",
+    "travel",
+    "trade",
+    "sacrifice",
+    "invade",
+    "catastrophe",
+];
+const COMMAND_ALIASES: &[(&str, &str)] = &[
+    ("h", "help"),
+    ("e", "end"),
+    ("q", "quit"),
+    ("v", "save"),
+    ("sh", "save-history"),
+    ("l", "load"),
+    ("b", "build"),
+    ("t", "travel"),
+    ("tr", "trade"),
+    ("x", "trade"),
+    ("sac", "sacrifice"),
+    ("i", "invade"),
+    ("c", "catastrophe"),
+];
 
 struct PromptedGame {
     game: Game,
@@ -136,25 +166,43 @@ fn command_completion(line: &str, pos: usize) -> Option<(usize, &'static str)> {
     }
 
     let token = &line[token_start..token_end];
-    exact_command_expansion(token).map(|replacement| (token_start, replacement))
+    command_word_completion(token).map(|replacement| (token_start, replacement))
 }
 
-fn exact_command_expansion(token: &str) -> Option<&'static str> {
-    match token.to_ascii_lowercase().as_str() {
-        "h" => Some("help"),
-        "e" => Some("end"),
-        "q" => Some("quit"),
-        "v" => Some("save"),
-        "sh" => Some("save-history"),
-        "l" => Some("load"),
-        "b" => Some("build"),
-        "t" => Some("travel"),
-        "tr" | "x" => Some("trade"),
-        "sac" => Some("sacrifice"),
-        "i" => Some("invade"),
-        "c" => Some("catastrophe"),
-        _ => None,
+fn command_word_completion(token: &str) -> Option<&'static str> {
+    let token = token.to_ascii_lowercase();
+
+    if let Some((_, target)) = COMMAND_ALIASES
+        .iter()
+        .find(|(alias, _)| *alias == token.as_str())
+    {
+        return Some(*target);
     }
+
+    if COMMAND_NAMES.contains(&token.as_str()) {
+        return None;
+    }
+
+    let mut matched = None;
+    for target in COMMAND_NAMES
+        .iter()
+        .copied()
+        .filter(|target| target.starts_with(&token))
+        .chain(
+            COMMAND_ALIASES
+                .iter()
+                .filter(|(alias, _)| alias.starts_with(&token))
+                .map(|(_, target)| *target),
+        )
+    {
+        match matched {
+            None => matched = Some(target),
+            Some(existing) if existing == target => {}
+            Some(_) => return None,
+        }
+    }
+
+    matched
 }
 
 struct RustylineInput {
@@ -938,6 +986,28 @@ mod tests {
     }
 
     #[test]
+    fn tab_completion_expands_unique_command_partials() {
+        for (input, expected) in [
+            ("bu", "build"),
+            ("cat", "catastrophe"),
+            ("en", "end"),
+            ("he", "help"),
+            ("inv", "invade"),
+            ("lo", "load"),
+            ("qui", "quit"),
+            ("sho", "show"),
+            ("save-h", "save-history"),
+            ("trav", "travel"),
+        ] {
+            assert_eq!(
+                command_completion(input, input.len()),
+                Some((0, expected)),
+                "{input} should complete to {expected}"
+            );
+        }
+    }
+
+    #[test]
     fn tab_completion_preserves_text_after_first_token() {
         assert_eq!(command_completion("b 0 gs", 1), Some((0, "build")));
         assert_eq!(command_completion("  b 0 gs", 3), Some((2, "build")));
@@ -946,8 +1016,7 @@ mod tests {
     #[test]
     fn tab_completion_ignores_ambiguous_partials_arguments_and_semicolons() {
         for input in [
-            "", "   ", "s", "show", "build", "save", "bu", "sa", "sav", "cat", "save-h", "b;",
-            "b 0 gs;",
+            "", "   ", "s", "show", "build", "save", "sa", "sav", "b;", "b 0 gs;",
         ] {
             assert_eq!(command_completion(input, input.len()), None, "{input}");
         }

@@ -18,22 +18,24 @@ editing and arrow-key history. Up/down browse setup lines and commands
 typed in the current run. Replayed commands are not added to this
 history, and history does not persist after the CLI exits.
 
-Press Tab at the end of an exact short command to expand it to the full
-command word:
+Press Tab at the end of a short command or unique partial command to
+expand it to the full command word:
 
 ```text
 b   -> build
+bu  -> build
 t   -> travel
 tr  -> trade
 x   -> trade
 sh  -> save-history
+save-h -> save-history
 sac -> sacrifice
 ```
 
 Expansion applies only to the first command word in an interactive
 terminal. It preserves any arguments already typed after that word.
-Ambiguous `s`, partial names such as `bu` or `save-h`, and lines
-containing `;` are left unchanged.
+Ambiguous partials such as `s` or `sa`, and lines containing `;`, are
+left unchanged.
 
 ## Homeworld Setup
 
