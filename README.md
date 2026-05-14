@@ -32,6 +32,11 @@ Player 2 stars> bl rl
 Player 2 ship> rm
 ```
 
+You can also enter `load <path>` or `l <path>` at the first setup prompt.
+For command history files loaded during setup, the first four non-empty
+lines are Player 1 stars, Player 1 ship, Player 2 stars, and Player 2
+ship; remaining lines replay as normal commands.
+
 After setup, use commands such as:
 
 ```text

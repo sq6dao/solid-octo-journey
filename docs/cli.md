@@ -25,6 +25,25 @@ Player 2 stars> bl rl
 Player 2 ship> rm
 ```
 
+You can also load a save or command history from the setup prompt:
+
+```text
+Player 1 stars> load scenario.hw
+```
+
+When a command history is loaded before setup is complete, the first four
+non-empty lines are read as setup input in this order:
+
+```text
+Player 1 stars
+Player 1 ship
+Player 2 stars
+Player 2 ship
+```
+
+Remaining lines are replayed as normal CLI commands after the game
+starts.
+
 Pieces can be written in compact or long form:
 
 - Compact: `gs`, `rm`, `bl`
@@ -144,9 +163,9 @@ See [save-format.md](save-format.md) for the YAML v1 schema.
 
 ## Command History Files
 
-`load <path>` also accepts plain text command history files. Each
-non-empty line is parsed as the same CLI command you would type at the
-prompt:
+`load <path>` also accepts plain text command history files. After setup,
+each non-empty line is parsed as the same CLI command you would type at
+the prompt:
 
 ```text
 b 0 gs

@@ -1,7 +1,7 @@
 use std::{
     fmt, fs,
     io::{self, BufRead, Write},
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 use hw_core::Player;
@@ -13,6 +13,18 @@ use crate::{
 };
 
 const MAX_LOAD_DEPTH: usize = 16;
+
+struct PromptedGame {
+    game: Game,
+    history: Option<LoadedHistory>,
+    show_after: bool,
+}
+
+struct LoadedHistory {
+    path: PathBuf,
+    commands: String,
+    show_after: bool,
+}
 
 pub fn run_stdio() -> io::Result<()> {
     let stdin = io::stdin();
@@ -26,14 +38,25 @@ where
     W: Write,
 {
     writeln!(output, "Homeworlds hot seat")?;
-    writeln!(output, "Enter pieces as gs, red medium, or yellow small.")?;
+    writeln!(
+        output,
+        "Enter pieces as gs, red medium, or yellow small, or load <path>."
+    )?;
 
-    let Some(mut game) = prompt_game(&mut input, &mut output)? else {
+    let Some(prompted) = prompt_game(&mut input, &mut output)? else {
         return Ok(());
     };
+    let mut game = prompted.game;
 
     writeln!(output, "Game started.")?;
     write!(output, "{}", render_turn_summary(&game))?;
+    if let Some(history) = prompted.history {
+        if run_loaded_history(history, &mut game, &mut output, 1)? == CommandOutcome::Quit {
+            return Ok(());
+        }
+    } else {
+        render_after_semicolon(prompted.show_after, &game, &mut output)?;
+    }
 
     let mut line = String::new();
     loop {
@@ -129,14 +152,16 @@ fn run_command<W: Write>(
                     }
                     Ok(LoadSource::History(history)) => {
                         writeln!(output, "Running commands from {}.", path.display())?;
-                        match run_history(&history, game, output, load_depth + 1)? {
-                            CommandOutcome::Continue => {
-                                writeln!(output, "Finished commands from {}.", path.display())?;
-                                render_after_semicolon(parsed.show_after, game, output)?;
-                                Ok(CommandOutcome::Continue)
-                            }
-                            CommandOutcome::Quit => Ok(CommandOutcome::Quit),
-                        }
+                        run_loaded_history(
+                            LoadedHistory {
+                                path,
+                                commands: history,
+                                show_after: parsed.show_after,
+                            },
+                            game,
+                            output,
+                            load_depth + 1,
+                        )
                     }
                     Err(error) => {
                         writeln!(output, "Error: {error}")?;
@@ -204,6 +229,22 @@ fn run_history<W: Write>(
     Ok(CommandOutcome::Continue)
 }
 
+fn run_loaded_history<W: Write>(
+    history: LoadedHistory,
+    game: &mut Game,
+    output: &mut W,
+    load_depth: usize,
+) -> io::Result<CommandOutcome> {
+    match run_history(&history.commands, game, output, load_depth)? {
+        CommandOutcome::Continue => {
+            writeln!(output, "Finished commands from {}.", history.path.display())?;
+            render_after_semicolon(history.show_after, game, output)?;
+            Ok(CommandOutcome::Continue)
+        }
+        CommandOutcome::Quit => Ok(CommandOutcome::Quit),
+    }
+}
+
 fn render_after_semicolon<W: Write>(
     show_after: bool,
     game: &Game,
@@ -215,21 +256,31 @@ fn render_after_semicolon<W: Write>(
     Ok(())
 }
 
-fn prompt_game<R, W>(input: &mut R, output: &mut W) -> io::Result<Option<Game>>
+fn prompt_game<R, W>(input: &mut R, output: &mut W) -> io::Result<Option<PromptedGame>>
 where
     R: BufRead,
     W: Write,
 {
     loop {
-        let Some(player_one) = prompt_setup(input, output, Player::One)? else {
-            return Ok(None);
+        let player_one = match prompt_setup(input, output, Player::One)? {
+            SetupPrompt::Setup(setup) => setup,
+            SetupPrompt::Loaded(prompted) => return Ok(Some(prompted)),
+            SetupPrompt::Eof => return Ok(None),
         };
-        let Some(player_two) = prompt_setup(input, output, Player::Two)? else {
-            return Ok(None);
+        let player_two = match prompt_setup(input, output, Player::Two)? {
+            SetupPrompt::Setup(setup) => setup,
+            SetupPrompt::Loaded(prompted) => return Ok(Some(prompted)),
+            SetupPrompt::Eof => return Ok(None),
         };
 
         match Game::new([player_one, player_two], Player::One) {
-            Ok(game) => return Ok(Some(game)),
+            Ok(game) => {
+                return Ok(Some(PromptedGame {
+                    game,
+                    history: None,
+                    show_after: false,
+                }));
+            }
             Err(error) => {
                 writeln!(
                     output,
@@ -241,11 +292,13 @@ where
     }
 }
 
-fn prompt_setup<R, W>(
-    input: &mut R,
-    output: &mut W,
-    player: Player,
-) -> io::Result<Option<HomeworldSetup>>
+enum SetupPrompt {
+    Setup(HomeworldSetup),
+    Loaded(PromptedGame),
+    Eof,
+}
+
+fn prompt_setup<R, W>(input: &mut R, output: &mut W, player: Player) -> io::Result<SetupPrompt>
 where
     R: BufRead,
     W: Write,
@@ -258,20 +311,155 @@ where
         write!(output, "{} stars> ", player_label(player))?;
         output.flush()?;
         if read_line(input, &mut stars)? == ReadLine::Eof {
-            return Ok(None);
+            return Ok(SetupPrompt::Eof);
+        }
+
+        if let Some(parsed) = parse_setup_load(stars.trim()) {
+            match parsed {
+                Ok((path, show_after)) => {
+                    if let Some(prompted) = load_game_from_setup(path, show_after, output)? {
+                        return Ok(SetupPrompt::Loaded(prompted));
+                    }
+                }
+                Err(error) => writeln!(output, "Error: {}", error.message())?,
+            }
+            continue;
         }
 
         write!(output, "{} ship> ", player_label(player))?;
         output.flush()?;
         if read_line(input, &mut ship)? == ReadLine::Eof {
-            return Ok(None);
+            return Ok(SetupPrompt::Eof);
         }
 
         match parse_setup(stars.trim(), ship.trim(), player) {
-            Ok(setup) => return Ok(Some(setup)),
+            Ok(setup) => return Ok(SetupPrompt::Setup(setup)),
             Err(error) => writeln!(output, "Error: {}", error.message())?,
         }
     }
+}
+
+fn parse_setup_load(line: &str) -> Option<Result<(PathBuf, bool), crate::parser::ParseError>> {
+    let first = line.split_whitespace().next()?;
+    if !matches!(first.to_ascii_lowercase().as_str(), "load" | "l") {
+        return None;
+    }
+
+    Some(
+        parse_input(line, Player::One).and_then(|parsed| match parsed.command {
+            ParsedCommand::Load(path) => Ok((path, parsed.show_after)),
+            _ => unreachable!("load command prefix parsed as a non-load command"),
+        }),
+    )
+}
+
+fn load_game_from_setup<W: Write>(
+    path: PathBuf,
+    show_after: bool,
+    output: &mut W,
+) -> io::Result<Option<PromptedGame>> {
+    match read_load_source(&path) {
+        Ok(LoadSource::Save(game)) => {
+            writeln!(output, "Loaded from {}.", path.display())?;
+            Ok(Some(PromptedGame {
+                game,
+                history: None,
+                show_after,
+            }))
+        }
+        Ok(LoadSource::History(history)) => match game_from_history_setup(&history) {
+            Ok((game, commands)) => {
+                writeln!(output, "Running commands from {}.", path.display())?;
+                Ok(Some(PromptedGame {
+                    game,
+                    history: Some(LoadedHistory {
+                        path,
+                        commands,
+                        show_after,
+                    }),
+                    show_after: false,
+                }))
+            }
+            Err(error) => {
+                writeln!(output, "Error: {error}")?;
+                Ok(None)
+            }
+        },
+        Err(error) => {
+            writeln!(output, "Error: {error}")?;
+            Ok(None)
+        }
+    }
+}
+
+#[derive(Debug)]
+enum SetupLoadError {
+    MissingSetupLine(&'static str),
+    InvalidSetup { player: Player, error: String },
+    InvalidGame(String),
+}
+
+impl fmt::Display for SetupLoadError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::MissingSetupLine(label) => {
+                write!(formatter, "command history is missing {label}")
+            }
+            Self::InvalidSetup { player, error } => {
+                write!(
+                    formatter,
+                    "invalid {} setup in command history: {error}",
+                    player_label(*player)
+                )
+            }
+            Self::InvalidGame(error) => {
+                write!(
+                    formatter,
+                    "invalid homeworld setup in command history: {error}"
+                )
+            }
+        }
+    }
+}
+
+fn game_from_history_setup(history: &str) -> Result<(Game, String), SetupLoadError> {
+    let mut commands = history
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty());
+    let player_one_stars = next_history_setup_line(&mut commands, "Player 1 stars")?;
+    let player_one_ship = next_history_setup_line(&mut commands, "Player 1 ship")?;
+    let player_two_stars = next_history_setup_line(&mut commands, "Player 2 stars")?;
+    let player_two_ship = next_history_setup_line(&mut commands, "Player 2 ship")?;
+
+    let player_one =
+        parse_setup(player_one_stars, player_one_ship, Player::One).map_err(|error| {
+            SetupLoadError::InvalidSetup {
+                player: Player::One,
+                error: error.to_string(),
+            }
+        })?;
+    let player_two =
+        parse_setup(player_two_stars, player_two_ship, Player::Two).map_err(|error| {
+            SetupLoadError::InvalidSetup {
+                player: Player::Two,
+                error: error.to_string(),
+            }
+        })?;
+    let game = Game::new([player_one, player_two], Player::One)
+        .map_err(|error| SetupLoadError::InvalidGame(format_game_error(&error)))?;
+    let commands = commands.collect::<Vec<_>>().join("\n");
+
+    Ok((game, commands))
+}
+
+fn next_history_setup_line<'a>(
+    commands: &mut impl Iterator<Item = &'a str>,
+    label: &'static str,
+) -> Result<&'a str, SetupLoadError> {
+    commands
+        .next()
+        .ok_or(SetupLoadError::MissingSetupLine(label))
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -657,6 +845,94 @@ q
         assert!(!output.contains("Running commands from "));
         assert!(output.contains("Current player: Player 1"));
         assert!(output.contains("Remaining actions: 1"));
+    }
+
+    #[test]
+    fn load_command_at_setup_reads_history_setup_lines() {
+        let path = temp_history_path("load_command_at_setup_reads_history_setup_lines");
+        fs::write(
+            &path,
+            "gm ys
+bl
+ys rm
+gl
+show
+",
+        )
+        .expect("history fixture writes");
+        let script = format!(
+            "l {}
+q
+",
+            path.display()
+        );
+
+        let output = run_script(&script);
+        let _ = fs::remove_file(path);
+
+        assert!(output.contains("Running commands from "));
+        assert!(output.contains("Game started."));
+        assert!(output.contains("[0] homeworld Player 1"));
+        assert!(output.contains("Stars: gm, ys"));
+        assert!(output.contains("Ships: P1 bl"));
+        assert!(output.contains("[1] homeworld Player 2"));
+        assert!(output.contains("Stars: ys, rm"));
+        assert!(output.contains("Ships: P2 gl"));
+        assert!(output.contains("Finished commands from "));
+    }
+
+    #[test]
+    fn load_command_at_setup_accepts_yaml_saves() {
+        let path = temp_save_path("load_command_at_setup_accepts_yaml_saves");
+        fs::write(
+            &path,
+            save::to_yaml(&Game::default(Player::Two)).expect("game serializes"),
+        )
+        .expect("save fixture writes");
+        let script = format!(
+            "load {}
+q
+",
+            path.display()
+        );
+
+        let output = run_script(&script);
+        let _ = fs::remove_file(path);
+
+        assert!(output.contains("Loaded from "));
+        assert!(output.contains("Game started."));
+        assert!(output.contains("Current player: Player 2"));
+    }
+
+    #[test]
+    fn failed_setup_load_keeps_prompting_for_setup() {
+        let path = temp_history_path("failed_setup_load_keeps_prompting_for_setup");
+        fs::write(
+            &path,
+            "ys bm
+gs
+",
+        )
+        .expect("history fixture writes");
+        let script = format!(
+            "l {}
+ys bm
+gs
+bl rl
+rm
+show
+q
+",
+            path.display()
+        );
+
+        let output = run_script(&script);
+        let _ = fs::remove_file(path);
+
+        assert!(output.contains("Error: command history is missing Player 2 stars"));
+        assert!(output.contains("Game started."));
+        assert!(output.contains("Stars: ys, bm"));
+        assert!(output.contains("Stars: bl, rl"));
     }
 
     fn run_script(input: &str) -> String {
