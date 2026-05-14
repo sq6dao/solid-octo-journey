@@ -221,6 +221,11 @@ fn run_history<W: Write>(
     load_depth: usize,
 ) -> io::Result<CommandOutcome> {
     for command in history_commands(history) {
+        writeln!(
+            output,
+            "{}> {command}",
+            prompt_label(game.turn().current_player())
+        )?;
         if run_command(command, game, output, load_depth)? == CommandOutcome::Quit {
             return Ok(CommandOutcome::Quit);
         }
@@ -742,8 +747,11 @@ q
         let _ = fs::remove_file(path);
 
         assert!(output.contains("Running commands from "));
+        assert!(output.contains("P1> b 0 gs"));
         assert!(output.contains("Action applied."));
+        assert!(output.contains("P1> e"));
         assert!(output.contains("Turn ended."));
+        assert!(output.contains("P2> show"));
         assert!(output.contains("Current player: Player 2"));
         assert!(output.contains("Finished commands from "));
     }
@@ -960,6 +968,7 @@ q
         assert!(output.contains("Ships: P1 bl"));
         assert!(output.contains("Stars: ys, rm"));
         assert!(output.contains("Ships: P2 gl"));
+        assert!(output.contains("P1> show"));
     }
 
     #[test]

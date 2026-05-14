@@ -176,9 +176,10 @@ show
 ```
 
 The commands run against the current game state. Errors are printed just
-like typed commands and later lines continue to run. A `quit` or `q`
-command in the history exits the session. Semicolon state printing works
-inside history files and after the outer load command:
+like typed commands and later lines continue to run. Each replayed
+command is printed with the current prompt before it runs. A `quit` or
+`q` command in the history exits the session. Semicolon state printing
+works inside history files and after the outer load command:
 
 ```text
 b 0 gs;
