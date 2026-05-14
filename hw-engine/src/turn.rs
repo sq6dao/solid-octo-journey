@@ -588,10 +588,11 @@ mod tests {
                 StarSystem::new(
                     vec![
                         Piece::new(Color::Red, Size::Small),
-                        Piece::new(Color::Red, Size::Medium),
+                        Piece::new(Color::Blue, Size::Medium),
                     ],
                     vec![
                         owned_ship(Player::One, Color::Red, Size::Small),
+                        owned_ship(Player::Two, Color::Red, Size::Medium),
                         owned_ship(Player::Two, Color::Red, Size::Large),
                         owned_ship(Player::One, Color::Green, Size::Small),
                         owned_ship(Player::One, Color::Green, Size::Medium),

@@ -477,7 +477,7 @@ fn apply_catastrophe_action_prunes_a_starless_non_homeworld_with_ships() {
 }
 
 #[test]
-fn apply_catastrophe_action_keeps_a_starless_homeworld() {
+fn apply_catastrophe_action_purges_a_starless_homeworld() {
     let remaining_ship = owned_ship(Player::One, Color::Blue, Size::Small);
     let state = state_with_systems_and_homeworlds(
         Bank::new(),
@@ -512,7 +512,11 @@ fn apply_catastrophe_action_keeps_a_starless_homeworld() {
 
     assert_eq!(next.systems().len(), 2);
     assert!(homeworld.stars().is_empty());
-    assert_eq!(homeworld.ships(), &[remaining_ship]);
+    assert!(homeworld.ships().is_empty());
+    assert_eq!(
+        next.bank().count(Color::Blue, Size::Small),
+        Bank::copies_per_piece() + 1
+    );
 }
 
 fn valid_state() -> GameState {

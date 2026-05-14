@@ -10,7 +10,12 @@ pub(super) fn apply(
     let mut bank = state.bank().clone();
     let (stars, ships) = shared::system_parts(state, system)?;
     let stars = remove_color(&mut bank, stars, color)?;
-    let ships = remove_color(&mut bank, ships, color)?;
+    let mut ships = remove_color(&mut bank, ships, color)?;
+
+    if stars.is_empty() && shared::homeworlds(state).contains(&system) {
+        return_pieces(&mut bank, ships)?;
+        ships = Vec::new();
+    }
 
     let mut systems = state.systems().to_vec();
     systems[system.index()] = shared::rebuild_system(stars, ships)?;
@@ -35,4 +40,15 @@ fn remove_color(
     }
 
     Ok(kept)
+}
+
+fn return_pieces(
+    bank: &mut hw_core::Bank,
+    pieces: Vec<Piece>,
+) -> Result<(), TransitionError> {
+    for piece in pieces {
+        shared::return_piece(bank, piece)?;
+    }
+
+    Ok(())
 }
