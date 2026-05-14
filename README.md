@@ -60,5 +60,6 @@ b 0 gs;
 
 Save files use hand-editable YAML. The same `load` command can also
 replay a plain text command history file with one CLI command per line.
-See [docs/cli.md](docs/cli.md) for the full command reference and
+History files ignore empty lines and `#` comments. See
+[docs/cli.md](docs/cli.md) for the full command reference and
 [docs/save-format.md](docs/save-format.md) for the save format.

@@ -220,8 +220,8 @@ fn run_history<W: Write>(
     output: &mut W,
     load_depth: usize,
 ) -> io::Result<CommandOutcome> {
-    for command in history.lines() {
-        if run_command(command.trim(), game, output, load_depth)? == CommandOutcome::Quit {
+    for command in history_commands(history) {
+        if run_command(command, game, output, load_depth)? == CommandOutcome::Quit {
             return Ok(CommandOutcome::Quit);
         }
     }
@@ -423,10 +423,7 @@ impl fmt::Display for SetupLoadError {
 }
 
 fn game_from_history_setup(history: &str) -> Result<(Game, String), SetupLoadError> {
-    let mut commands = history
-        .lines()
-        .map(str::trim)
-        .filter(|line| !line.is_empty());
+    let mut commands = history_commands(history);
     let player_one_stars = next_history_setup_line(&mut commands, "Player 1 stars")?;
     let player_one_ship = next_history_setup_line(&mut commands, "Player 1 ship")?;
     let player_two_stars = next_history_setup_line(&mut commands, "Player 2 stars")?;
@@ -460,6 +457,18 @@ fn next_history_setup_line<'a>(
     commands
         .next()
         .ok_or(SetupLoadError::MissingSetupLine(label))
+}
+
+fn history_commands(history: &str) -> impl Iterator<Item = &str> {
+    history.lines().filter_map(history_command)
+}
+
+fn history_command(line: &str) -> Option<&str> {
+    let command = line
+        .split_once('#')
+        .map_or(line, |(command, _)| command)
+        .trim();
+    (!command.is_empty()).then_some(command)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -740,6 +749,42 @@ q
     }
 
     #[test]
+    fn history_load_ignores_blank_lines_and_comments() {
+        let path = temp_history_path("history_load_ignores_blank_lines_and_comments");
+        fs::write(
+            &path,
+            "# Build a ship, then pass the turn.
+
+b 0 gs # use green power
+
+# Comments can occupy whole lines.
+e # end the turn
+show # inspect the resulting state
+",
+        )
+        .expect("history fixture writes");
+        let script = format!(
+            "ys bm
+gs
+bl rl
+rm
+l {}
+q
+",
+            path.display()
+        );
+
+        let output = run_script(&script);
+        let _ = fs::remove_file(path);
+
+        assert!(!output.contains("Error:"));
+        assert!(output.contains("Action applied."));
+        assert!(output.contains("Turn ended."));
+        assert!(output.contains("Current player: Player 2"));
+        assert!(output.contains("Finished commands from "));
+    }
+
+    #[test]
     fn history_load_supports_semicolon_state_printing() {
         let path = temp_history_path("history_load_supports_semicolon_state_printing");
         fs::write(
@@ -879,6 +924,42 @@ q
         assert!(output.contains("Stars: ys, rm"));
         assert!(output.contains("Ships: P2 gl"));
         assert!(output.contains("Finished commands from "));
+    }
+
+    #[test]
+    fn setup_history_ignores_blank_lines_and_comments() {
+        let path = temp_history_path("setup_history_ignores_blank_lines_and_comments");
+        fs::write(
+            &path,
+            "# Setup starts below.
+
+gm ys # Player 1 stars
+bl # Player 1 ship
+
+# Player 2 setup.
+ys rm # Player 2 stars
+gl # Player 2 ship
+
+show # remaining commands still run
+",
+        )
+        .expect("history fixture writes");
+        let script = format!(
+            "l {}
+q
+",
+            path.display()
+        );
+
+        let output = run_script(&script);
+        let _ = fs::remove_file(path);
+
+        assert!(!output.contains("Error:"));
+        assert!(output.contains("Game started."));
+        assert!(output.contains("Stars: gm, ys"));
+        assert!(output.contains("Ships: P1 bl"));
+        assert!(output.contains("Stars: ys, rm"));
+        assert!(output.contains("Ships: P2 gl"));
     }
 
     #[test]

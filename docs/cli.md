@@ -165,11 +165,13 @@ See [save-format.md](save-format.md) for the YAML v1 schema.
 
 `load <path>` also accepts plain text command history files. After setup,
 each non-empty line is parsed as the same CLI command you would type at
-the prompt:
+the prompt. Empty lines are ignored. `#` starts a comment that runs until
+the end of the line, so `#`-only lines are also ignored:
 
 ```text
+# Opening turn
 b 0 gs
-e
+e # pass to Player 2
 show
 ```
 
