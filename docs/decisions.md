@@ -777,7 +777,65 @@ input for tests and scenario files.
 
 ---
 
+## 2026-05-14 – AI Architecture
+
+**Decision**
+Build AI support in a future `hw-ai` crate. The crate will depend on
+`hw-core` and `hw-engine`, while `hw-engine` remains the source of truth
+for legality and state transitions.
+
+The first public AI unit is one decision at a time, not a full turn plan.
+Planned public concepts are:
+
+- `AiDecision::Action(Action)`
+- `AiDecision::EndTurn`
+- `legal_decisions(game: &Game)`
+- `Strategy`
+- `FirstLegalStrategy`
+
+V1 AI is deterministic and uses no randomness. Legal decision generation
+comes before evaluation or search. CLI and TUI integration should wait
+until reusable AI APIs exist.
+
+Legal generation must preserve current game rules:
+
+- New discoveries are one-star systems only
+- Two-star systems are homeworlds only
+- Both homeworlds exist from game start
+- AI generation must never emit a two-star discovery action
+
+Generated candidates should be filtered through existing engine APIs,
+such as `Game::apply_action` and `Game::end_turn`, instead of duplicating
+rule authority in AI code.
+
+**Context**
+AI needs legal move generation before any useful heuristic or search can
+be written. The current engine validates and applies proposed actions but
+does not enumerate legal actions. A reusable AI layer lets CLI and future
+TUI support share the same strategies.
+
+Homeworlds turns can include free catastrophes and sacrifice-granted
+multi-action sequences. Selecting one decision at a time keeps the first
+API aligned with existing `Game` and `TurnState` behavior while still
+allowing UI drivers to build a full AI turn by repeated calls.
+
+**Alternatives**
+- Implement AI directly in `hw-cli`
+- Put AI policy inside `hw-engine`
+- Start with minimax or other search before legal generation
+- Generate whole turn plans instead of single decisions
+- Allow randomized tie-breaking in v1
+
+**Consequences**
++ AI policy stays separate from core rules and UI code
++ Legal generation can be tested independently of search quality
++ CLI and TUI can reuse the same AI APIs later
++ Deterministic v1 behavior makes tests and replay debugging simpler
+- A new crate adds workspace surface area
+- Whole-turn planning remains a later layer over single decisions
+
+---
+
 ## Future Decisions (To Be Made)
 
-- AI architecture
 - Networking approach

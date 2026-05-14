@@ -183,13 +183,95 @@ Stable save/load support and state interchange.
 ## Phase 7 – AI Player
 
 ### Goal
-Deterministic computer player support.
+Deterministic reusable computer player support.
 
-- [ ] Generate legal actions from a game state
-- [ ] Add a basic heuristic evaluator
-- [ ] Implement one-ply or shallow-search move selection
+AI support should start as a reusable engine-adjacent layer, not as
+CLI-only logic. The first implementation should live in a new `hw-ai`
+crate that depends on `hw-core` and `hw-engine`.
+
+The first public AI unit is one decision at a time:
+
+- `AiDecision::Action(Action)`
+- `AiDecision::EndTurn`
+- `legal_decisions(game: &Game) -> Vec<AiDecision>`
+- `Strategy`, with a deterministic `FirstLegalStrategy`
+
+The UI driver can repeatedly ask a strategy for the next decision until
+the turn passes or the game ends.
+
+Rule constraints for legal generation:
+
+- New discoveries are one-star systems only
+- Two-star systems are homeworlds only
+- Both homeworlds exist from game start
+- Legal generation must never emit a two-star discovery action
+
+#### AI-1: Legal Decisions
+
+- [ ] Add the `hw-ai` workspace crate
+- [ ] Generate deterministic legal `AiDecision` values from `Game`
+- [ ] Include `EndTurn` only when `game.end_turn()` succeeds
+- [ ] Generate legal catastrophes even at zero action budget
+- [ ] Generate paid actions only when budget and sacrifice action-kind
+  restrictions allow them
+- [ ] Filter candidate actions through existing `Game::apply_action`
+- [ ] Use deterministic ordering by system ID, action kind, color, size,
+  and piece order
+- [ ] Remove duplicate equivalent decisions
+- [ ] Test that every generated action applies successfully
+- [ ] Test that no generated decision discovers a two-star system
+
+Initial action coverage:
+
+- [ ] Build from every plausible bank ship candidate
+- [ ] Travel owned ships to existing systems
+- [ ] Travel owned ships to new one-star discoveries
+- [ ] Trade owned ships to same-size bank ships of other colors
+- [ ] Sacrifice owned ships
+- [ ] Invade opponent ships in shared systems
+- [ ] Catastrophe for every overpopulated system/color
+
+#### AI-2: Baseline Strategies
+
+- [ ] Add `FirstLegalStrategy`
+- [ ] Add a simple deterministic priority strategy
+- [ ] Prefer immediate wins, then necessary catastrophes, then paid
+  actions, then legal turn end
+- [ ] Test deterministic tie-breaking
+- [ ] Test terminal-state handling
+
+#### AI-3: Heuristic Evaluation
+
+- [ ] Add a board-position evaluator
+- [ ] Score homeworld safety
+- [ ] Score ship count and ship size
+- [ ] Score color access and action flexibility
+- [ ] Score opponent pressure and invasion threats
+- [ ] Account for bank scarcity
+- [ ] Keep the evaluator deterministic and explainable in tests
+
+#### AI-4: Shallow Search
+
+- [ ] Add one-ply move selection over `AiDecision`
+- [ ] Add configurable depth-limited search
+- [ ] Use deterministic tie-breaking for equal scores
+- [ ] Keep randomness out of v1 search
+- [ ] Test search on small tactical fixtures
+
+#### AI-5: UI Integration
+
 - [ ] Add human-vs-AI support to the CLI
-- [ ] Test deterministic move selection and terminal-state handling
+- [ ] Let the CLI repeatedly apply AI decisions until the AI turn ends
+- [ ] Print AI decisions in the same notation as replayed commands where
+  practical
+- [ ] Reuse the same `hw-ai` APIs from the future TUI
+
+#### AI-6: Stronger AI
+
+- [ ] Consider alpha-beta search
+- [ ] Consider seeded randomized tie-breaking
+- [ ] Consider opening books
+- [ ] Add replay/history tooling for AI regression games
 
 ---
 
@@ -211,7 +293,6 @@ Richer playable terminal UI, probably with Ratatui.
 
 - [ ] Network multiplayer
 - [ ] GUI (optional)
-- [ ] Stronger AI search and heuristics
 - [ ] Replay/history tooling
 
 ---
