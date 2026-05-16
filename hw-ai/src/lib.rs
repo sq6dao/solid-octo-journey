@@ -573,9 +573,10 @@ mod tests {
 
         let decisions = legal_decisions(&game);
         assert!(!decisions.is_empty());
+        assert!(decisions.contains(&AiDecision::EndTurn));
         assert!(decisions.iter().all(|decision| match decision {
             AiDecision::Action(action) => action.kind() == ActionKind::Build,
-            AiDecision::EndTurn => false,
+            AiDecision::EndTurn => true,
         }));
     }
 

@@ -19,7 +19,13 @@ pub enum TransitionError {
 
 pub fn apply_action(state: &GameState, action: &Action) -> Result<GameState, TransitionError> {
     validate_action(state, action).map_err(TransitionError::InvalidAction)?;
+    apply_action_unchecked(state, action)
+}
 
+pub(crate) fn apply_action_unchecked(
+    state: &GameState,
+    action: &Action,
+) -> Result<GameState, TransitionError> {
     match action {
         Action::Build {
             player,

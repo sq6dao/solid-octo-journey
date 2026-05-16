@@ -1,0 +1,139 @@
+# Andy/Russell full game.
+# Source: https://www.wunderland.com/WTS/Andy/Games/HomeworldsPBEM/Game1Report9.html
+# Player 1 is Andy. Player 2 is Russell.
+# System IDs begin by discovery order:
+# 0 Paradise, 1 Peace, 2 Cobalt, 3 Loverly, 4 Garden, 5 Jolly,
+# 6 Freedom, 7 Shade, 8 Springtime.
+# After Cobalt and Garden are emptied on move 48, later system IDs shift.
+#
+# The source notation appears to reference MYSB for Andy moves 5 and 9;
+# those commands are encoded against Paradise, where Andy has the ships.
+
+# 1-2: homeworld setup
+gl bs
+rl
+ym bs
+gl
+
+# 3-4
+b 0 rs
+b 1 gs
+
+# 5-6
+x 0 rs gs
+x 1 gs bs
+
+# 7-8
+b 0 rs
+b 1 gs
+
+# 9-10
+x 0 rs ys
+b 1 bm
+
+# 11-12
+t 0 gs n bm
+t 1 bm n gl
+
+# 13-14
+b 0 rs
+b 3 bm
+
+# 15-16
+x 0 rl bl
+x 3 bm ym
+
+# 17-18
+b 0 ys
+s 1 gl
+b 3 bm
+b 3 bl
+b 1 bl
+
+# 19-20
+t 0 ys n gm
+s 3 bm
+x 3 bl rl
+x 1 bl gl
+
+# 21-22
+b 4 ys
+t 3 rl x 4
+
+# 23-24
+b 4 ym
+t 3 ym x 4
+c 4 y
+
+# 25-26
+b 2 gs
+s 1 gl
+b 3 bm
+b 3 bl
+b 1 bl
+
+# 27-28
+x 0 bl gl
+s 3 bl
+x 3 bm gm
+x 3 bm ym
+x 1 bl rl
+
+# 29-30
+x 2 gs ys
+b 1 bm
+
+# 31-32
+b 2 ys
+t 3 gm x 2
+
+# 33-34
+s 0 gl
+b 2 ym
+b 0 yl
+b 0 yl
+t 1 bm x 3
+
+# 35-36
+s 2 ym
+t 2 ys n gl
+t 2 ys x 5
+t 1 rl x 5
+
+# 37-38
+s 5 ys
+t 2 gs n bl
+i 5 ys
+
+# 39-40
+t 0 yl n gm
+t 5 rl x 2
+
+# 41-42
+b 0 rs
+b 3 bm
+
+# 43-44
+t 0 rs x 7
+s 2 gm
+b 3 bl
+b 1 bl
+
+# 45-46
+t 0 ys n gm
+s 3 bm
+x 3 bl rl
+x 4 rl bl
+
+# 47-48
+b 7 rs
+s 3 ym
+t 2 rl x 0
+t 3 bl x 0
+
+# 49
+s 0 yl
+t 5 rs x 0
+t 5 rs x 0
+c 0 r
+e

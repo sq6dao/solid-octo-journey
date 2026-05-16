@@ -1,6 +1,6 @@
 use hw_core::{Color, GameState, Player, Size};
 
-use crate::{Action, ActionKind, TransitionError};
+use crate::{Action, ActionError, ActionKind, TransitionError};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TurnState {
@@ -100,7 +100,9 @@ impl TurnState {
             }
         }
 
-        let state = crate::apply_action(&self.state, action).map_err(TurnError::InvalidAction)?;
+        self.validate_paid_action(action)?;
+        let state = crate::transition::apply_action_unchecked(&self.state, action)
+            .map_err(TurnError::InvalidAction)?;
 
         if let Action::Sacrifice { ship, .. } = action {
             return Ok(Self {
@@ -126,7 +128,7 @@ impl TurnState {
     }
 
     pub fn end_turn(&self) -> Result<Self, TurnError> {
-        if self.remaining_actions > 0 {
+        if self.remaining_actions > 0 && self.required_action.is_none() {
             return Err(TurnError::ActionsRemaining {
                 remaining: self.remaining_actions,
             });
@@ -138,6 +140,33 @@ impl TurnState {
             remaining_actions: 1,
             required_action: None,
         })
+    }
+
+    fn validate_paid_action(&self, action: &Action) -> Result<(), TurnError> {
+        match crate::validate_action(&self.state, action) {
+            Ok(()) => Ok(()),
+            Err(error) if self.sacrifice_power_covers(action, &error) => Ok(()),
+            Err(error) => Err(TurnError::InvalidAction(TransitionError::InvalidAction(
+                error,
+            ))),
+        }
+    }
+
+    fn sacrifice_power_covers(&self, action: &Action, error: &ActionError) -> bool {
+        let Some(expected) = self.required_action else {
+            return false;
+        };
+        if action.kind() != expected {
+            return false;
+        }
+        let Some(expected_color) = action_kind_color(expected) else {
+            return false;
+        };
+
+        matches!(
+            error,
+            ActionError::MissingActionPower { color, .. } if *color == expected_color
+        )
     }
 }
 
@@ -173,6 +202,16 @@ const fn sacrifice_action_kind(color: Color) -> ActionKind {
         Color::Yellow => ActionKind::Travel,
         Color::Blue => ActionKind::Trade,
         Color::Red => ActionKind::Invade,
+    }
+}
+
+const fn action_kind_color(kind: ActionKind) -> Option<Color> {
+    match kind {
+        ActionKind::Build => Some(Color::Green),
+        ActionKind::Travel => Some(Color::Yellow),
+        ActionKind::Trade => Some(Color::Blue),
+        ActionKind::Invade => Some(Color::Red),
+        ActionKind::Sacrifice | ActionKind::Catastrophe => None,
     }
 }
 
@@ -432,6 +471,70 @@ mod tests {
     }
 
     #[test]
+    fn sacrifice_travel_actions_do_not_require_yellow_power_at_source() {
+        let sacrifice_ship = owned_ship(Player::One, Color::Yellow, Size::Medium);
+        let moving_ship = owned_ship(Player::One, Color::Green, Size::Small);
+        let turn = TurnState::new(
+            state_for_yellow_sacrifice_without_local_power(),
+            Player::One,
+        );
+        let sacrifice = sacrifice_action(Player::One, sacrifice_ship);
+        let travel = Action::Travel {
+            player: Player::One,
+            from: SystemId::new(0),
+            ship: moving_ship,
+            target: TravelTarget::Existing(SystemId::new(1)),
+        };
+
+        let traveled = turn
+            .apply_action(&sacrifice)
+            .expect("sacrifice applies")
+            .apply_action(&travel)
+            .expect("travel applies without local yellow power");
+
+        assert_eq!(traveled.remaining_actions(), 1);
+        assert!(
+            traveled
+                .state()
+                .system(SystemId::new(1))
+                .expect("target exists")
+                .ships()
+                .contains(&moving_ship)
+        );
+    }
+
+    #[test]
+    fn sacrifice_trade_actions_do_not_require_blue_power_at_system() {
+        let sacrifice_ship = owned_ship(Player::One, Color::Blue, Size::Medium);
+        let from = owned_ship(Player::One, Color::Green, Size::Small);
+        let to = owned_ship(Player::One, Color::Red, Size::Small);
+        let turn = TurnState::new(state_for_blue_sacrifice_without_local_power(), Player::One);
+        let sacrifice = sacrifice_action(Player::One, sacrifice_ship);
+        let trade = Action::Trade {
+            player: Player::One,
+            system: SystemId::new(1),
+            from,
+            to,
+        };
+
+        let traded = turn
+            .apply_action(&sacrifice)
+            .expect("sacrifice applies")
+            .apply_action(&trade)
+            .expect("trade applies without local blue power");
+
+        assert_eq!(traded.remaining_actions(), 1);
+        assert!(
+            traded
+                .state()
+                .system(SystemId::new(1))
+                .expect("trade system exists")
+                .ships()
+                .contains(&to)
+        );
+    }
+
+    #[test]
     fn sacrifice_turns_reject_nonmatching_action_kinds() {
         let sacrifice_ship = owned_ship(Player::One, Color::Green, Size::Small);
         let turn = TurnState::new(state_with_green_sacrifice_ship(Size::Small), Player::One);
@@ -506,6 +609,20 @@ mod tests {
 
         assert_eq!(traveled.current_player(), Player::Two);
         assert_eq!(traveled.remaining_actions(), 0);
+    }
+
+    #[test]
+    fn ending_a_sacrifice_turn_allows_unspent_granted_actions() {
+        let sacrifice_ship = owned_ship(Player::One, Color::Green, Size::Large);
+        let turn = TurnState::new(state_with_green_sacrifice_ship(Size::Large), Player::One);
+        let sacrifice = sacrifice_action(Player::One, sacrifice_ship);
+        let sacrificed = turn.apply_action(&sacrifice).expect("sacrifice applies");
+
+        let next_turn = sacrificed.end_turn().expect("sacrifice turn ends early");
+
+        assert_eq!(next_turn.current_player(), Player::Two);
+        assert_eq!(next_turn.remaining_actions(), 1);
+        assert_eq!(next_turn.required_action(), None);
     }
 
     fn build_action(player: Player, ship: Piece) -> Action {
@@ -602,6 +719,49 @@ mod tests {
                 StarSystem::new(
                     vec![Piece::new(Color::Green, Size::Medium)],
                     vec![owned_ship(Player::Two, Color::Yellow, Size::Small)],
+                )
+                .expect("system is valid"),
+            ],
+            [SystemId::new(0), SystemId::new(1)],
+            Bank::new(),
+        )
+        .expect("state is valid")
+    }
+
+    fn state_for_yellow_sacrifice_without_local_power() -> GameState {
+        GameState::new(
+            vec![
+                StarSystem::new(
+                    vec![Piece::new(Color::Red, Size::Small)],
+                    vec![
+                        owned_ship(Player::One, Color::Yellow, Size::Medium),
+                        owned_ship(Player::One, Color::Green, Size::Small),
+                    ],
+                )
+                .expect("system is valid"),
+                StarSystem::new(
+                    vec![Piece::new(Color::Green, Size::Medium)],
+                    vec![owned_ship(Player::Two, Color::Red, Size::Small)],
+                )
+                .expect("system is valid"),
+            ],
+            [SystemId::new(0), SystemId::new(1)],
+            Bank::new(),
+        )
+        .expect("state is valid")
+    }
+
+    fn state_for_blue_sacrifice_without_local_power() -> GameState {
+        GameState::new(
+            vec![
+                StarSystem::new(
+                    vec![Piece::new(Color::Red, Size::Small)],
+                    vec![owned_ship(Player::One, Color::Blue, Size::Medium)],
+                )
+                .expect("system is valid"),
+                StarSystem::new(
+                    vec![Piece::new(Color::Yellow, Size::Medium)],
+                    vec![owned_ship(Player::One, Color::Green, Size::Small)],
                 )
                 .expect("system is valid"),
             ],

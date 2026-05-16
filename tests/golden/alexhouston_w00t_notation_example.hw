@@ -1,0 +1,49 @@
+# alexhouston/w00t notation example.
+# Source: https://boardgamegeek.com/thread/1764731/homeworlds-game-notation
+# Player 1 is alexhouston. Player 2 is w00t.
+# System IDs:
+# 0 alexhouston, 1 w00t, 2 post, 3 boop, 4 bop.
+
+# 1: homeworld setup
+ym bl
+gl
+gl bs
+yl
+
+# 2
+b 0 gs
+b 1 ys
+
+# 3
+b 0 gs
+b 1 ys
+
+# 4
+t 0 gs n bs
+x 1 ys rs
+
+# 5
+x 0 gs ys
+t 1 ys n gm
+
+# 6
+b 2 gs
+b 1 rs
+
+# 7
+x 2 gs rs
+t 1 rs x 3
+
+# 8
+b 2 rm
+b 3 rm
+
+# 9
+b 2 gs
+t 3 rm n gl
+
+# 10
+t 0 ys x 2
+x 1 rs bs
+
+show

@@ -43,6 +43,24 @@ const GOLDEN_CASES: &[GoldenCase] = &[
         ],
         reject: &["Error:", "Opening comment"],
     },
+    GoldenCase {
+        name: "andy russell full game",
+        history: include_str!("../../tests/golden/andy_russell_full_game.hw"),
+        expect: &["Game started.", "Status: finished, winner Player 2"],
+        reject: &["Error:"],
+    },
+    GoldenCase {
+        name: "alexhouston w00t notation example",
+        history: include_str!("../../tests/golden/alexhouston_w00t_notation_example.hw"),
+        expect: &[
+            "Game started.",
+            "Status: in progress",
+            "Current player: Player 1",
+            "[4] system",
+            "Ships: P2 rm",
+        ],
+        reject: &["Error:"],
+    },
 ];
 
 #[test]
