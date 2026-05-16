@@ -4,8 +4,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use hw_ai::{AiDecision, FirstLegalStrategy, PriorityStrategy, Strategy};
 use hw_core::{Color, Piece, Player, Size};
-use hw_engine::{Game, GameStatus, HomeworldSetup, has_possible_catastrophe, save};
+use hw_engine::{
+    Action, Game, GameStatus, HomeworldSetup, TravelTarget, has_possible_catastrophe, save,
+};
 use rustyline::{
     Context, Editor, Helper,
     completion::{Completer, Pair},
@@ -17,7 +20,7 @@ use rustyline::{
 };
 
 use crate::{
-    parser::{ParsedCommand, parse_input, parse_setup},
+    parser::{AiCommand, AiStrategy, ParsedCommand, parse_input, parse_setup},
     render::{render_game, render_help, render_turn_summary},
 };
 
@@ -27,6 +30,7 @@ const COMMAND_NAMES: &[&str] = &[
     "show",
     "end",
     "quit",
+    "ai",
     "save",
     "save-history",
     "load",
@@ -54,6 +58,9 @@ const COMMAND_ALIASES: &[(&str, &str)] = &[
 ];
 const TRAVEL_TARGET_WORDS: &[&str] = &["existing", "new", "x", "n"];
 const COLOR_WORDS: &[&str] = &["red", "yellow", "green", "blue", "r", "y", "g", "b"];
+const AI_TARGET_WORDS: &[&str] = &["show", "p1", "p2"];
+const AI_MODE_WORDS: &[&str] = &["first", "priority", "off"];
+const MAX_AI_DECISIONS: usize = 512;
 
 struct PromptedGame {
     game: Game,
@@ -68,6 +75,35 @@ struct LoadedHistory {
 }
 
 type TypedHistory = Vec<String>;
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+struct AiControl {
+    player_one: Option<AiStrategy>,
+    player_two: Option<AiStrategy>,
+}
+
+impl AiControl {
+    fn strategy(&self, player: Player) -> Option<AiStrategy> {
+        match player {
+            Player::One => self.player_one,
+            Player::Two => self.player_two,
+        }
+    }
+
+    fn set_strategy(&mut self, player: Player, strategy: AiStrategy) {
+        match player {
+            Player::One => self.player_one = Some(strategy),
+            Player::Two => self.player_two = Some(strategy),
+        }
+    }
+
+    fn disable(&mut self, player: Player) {
+        match player {
+            Player::One => self.player_one = None,
+            Player::Two => self.player_two = None,
+        }
+    }
+}
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 struct CompletionSnapshot {
@@ -372,6 +408,13 @@ fn argument_candidates(
             1 => Some(static_word_candidates(current, COLOR_WORDS)),
             _ => None,
         },
+        "ai" => match arg_index {
+            0 => Some(static_word_candidates(current, AI_TARGET_WORDS)),
+            1 if matches!(tokens.get(1), Some(&"p1" | &"p2")) => {
+                Some(static_word_candidates(current, AI_MODE_WORDS))
+            }
+            _ => None,
+        },
         _ => None,
     }
 }
@@ -561,6 +604,7 @@ where
         return Ok(());
     };
     let mut game = prompted.game;
+    let mut ai_control = AiControl::default();
 
     writeln!(output, "Game started.")?;
     let render_full_after_setup = prompted.history.is_none() && prompted.show_after;
@@ -571,8 +615,14 @@ where
     }
     if let Some(history) = prompted.history {
         writeln!(output, "Running commands from {}.", history.path.display())?;
-        if run_loaded_history(history, &mut game, &mut output, 1, &typed_history)?
-            == CommandOutcome::Quit
+        if run_loaded_history(
+            history,
+            &mut game,
+            &mut ai_control,
+            &mut output,
+            1,
+            &typed_history,
+        )? == CommandOutcome::Quit
         {
             return Ok(());
         }
@@ -595,7 +645,14 @@ where
         let command = line.trim();
         record_user_history(input, &mut typed_history, command)?;
 
-        if run_command(command, &mut game, &mut output, 0, &typed_history)? == CommandOutcome::Quit
+        if run_command(
+            command,
+            &mut game,
+            &mut ai_control,
+            &mut output,
+            0,
+            &typed_history,
+        )? == CommandOutcome::Quit
         {
             break;
         }
@@ -633,6 +690,7 @@ impl fmt::Display for LoadSourceError {
 fn run_command<W: Write>(
     command: &str,
     game: &mut Game,
+    ai_control: &mut AiControl,
     output: &mut W,
     load_depth: usize,
     typed_history: &[String],
@@ -657,6 +715,12 @@ fn run_command<W: Write>(
             ParsedCommand::Quit => {
                 writeln!(output, "Goodbye.")?;
                 Ok(CommandOutcome::Quit)
+            }
+            ParsedCommand::Ai(command) => {
+                run_ai_command(command, ai_control, output)?;
+                render_after_semicolon(parsed.show_after, game, output)?;
+                run_ai_turns(game, ai_control, output)?;
+                Ok(CommandOutcome::Continue)
             }
             ParsedCommand::Save(path) => {
                 match save::save_file(game, &path) {
@@ -701,6 +765,7 @@ fn run_command<W: Write>(
                         write!(output, "{}", render_turn_summary(game))?;
                         if loaded.commands.is_empty() {
                             render_after_semicolon(parsed.show_after, game, output)?;
+                            run_ai_turns(game, ai_control, output)?;
                             Ok(CommandOutcome::Continue)
                         } else {
                             writeln!(output, "Running commands from {}.", path.display())?;
@@ -711,6 +776,7 @@ fn run_command<W: Write>(
                                     show_after: parsed.show_after,
                                 },
                                 game,
+                                ai_control,
                                 output,
                                 load_depth + 1,
                                 typed_history,
@@ -726,6 +792,7 @@ fn run_command<W: Write>(
                                 show_after: parsed.show_after,
                             },
                             game,
+                            ai_control,
                             output,
                             load_depth + 1,
                             typed_history,
@@ -745,6 +812,7 @@ fn run_command<W: Write>(
                         writeln!(output, "Turn ended.")?;
                         write!(output, "{}", render_turn_summary(game))?;
                         render_after_semicolon(parsed.show_after, game, output)?;
+                        run_ai_turns(game, ai_control, output)?;
                     }
                     Err(error) => {
                         writeln!(output, "Error: {}", format_game_error(&error))?;
@@ -761,6 +829,7 @@ fn run_command<W: Write>(
                         auto_end_turn_if_ready(game, output)?;
                         write!(output, "{}", render_turn_summary(game))?;
                         render_after_semicolon(parsed.show_after, game, output)?;
+                        run_ai_turns(game, ai_control, output)?;
                     }
                     Err(error) => {
                         writeln!(output, "Error: {}", format_game_error(&error))?;
@@ -781,6 +850,172 @@ fn run_command<W: Write>(
 fn command_requests_state_after_error(command: &str) -> bool {
     let trimmed = command.trim();
     matches!(trimmed.find(';'), Some(index) if index == trimmed.len() - 1)
+}
+
+fn run_ai_command<W: Write>(
+    command: AiCommand,
+    ai_control: &mut AiControl,
+    output: &mut W,
+) -> io::Result<()> {
+    match command {
+        AiCommand::Show => writeln!(output, "{}", render_ai_control(ai_control)),
+        AiCommand::Set { player, strategy } => {
+            ai_control.set_strategy(player, strategy);
+            writeln!(
+                output,
+                "AI {} set to {}.",
+                player_label(player),
+                ai_strategy_label(strategy)
+            )
+        }
+        AiCommand::Off { player } => {
+            ai_control.disable(player);
+            writeln!(output, "AI {} disabled.", player_label(player))
+        }
+    }
+}
+
+fn render_ai_control(ai_control: &AiControl) -> String {
+    format!(
+        "AI players: {} {}, {} {}",
+        player_label(Player::One),
+        ai_strategy_or_human(ai_control.strategy(Player::One)),
+        player_label(Player::Two),
+        ai_strategy_or_human(ai_control.strategy(Player::Two))
+    )
+}
+
+fn ai_strategy_or_human(strategy: Option<AiStrategy>) -> &'static str {
+    strategy.map_or("human", ai_strategy_label)
+}
+
+fn ai_strategy_label(strategy: AiStrategy) -> &'static str {
+    match strategy {
+        AiStrategy::First => "first",
+        AiStrategy::Priority => "priority",
+    }
+}
+
+fn run_ai_turns<W: Write>(
+    game: &mut Game,
+    ai_control: &AiControl,
+    output: &mut W,
+) -> io::Result<()> {
+    for _ in 0..MAX_AI_DECISIONS {
+        if game.status() != GameStatus::InProgress {
+            return Ok(());
+        }
+
+        let player = game.turn().current_player();
+        let Some(strategy) = ai_control.strategy(player) else {
+            return Ok(());
+        };
+        let Some(decision) = choose_ai_decision(strategy, game) else {
+            writeln!(output, "AI has no legal decision.")?;
+            return Ok(());
+        };
+
+        writeln!(
+            output,
+            "{}> {}",
+            prompt_label(player),
+            ai_decision_command(&decision)
+        )?;
+        apply_ai_decision(game, decision, output)?;
+    }
+
+    writeln!(output, "AI stopped after {MAX_AI_DECISIONS} decisions.")
+}
+
+fn choose_ai_decision(strategy: AiStrategy, game: &Game) -> Option<AiDecision> {
+    match strategy {
+        AiStrategy::First => FirstLegalStrategy.choose(game),
+        AiStrategy::Priority => PriorityStrategy.choose(game),
+    }
+}
+
+fn apply_ai_decision<W: Write>(
+    game: &mut Game,
+    decision: AiDecision,
+    output: &mut W,
+) -> io::Result<()> {
+    match decision {
+        AiDecision::Action(action) => match game.apply_action(&action) {
+            Ok(next) => {
+                *game = next;
+                writeln!(output, "Action applied.")?;
+                auto_end_turn_if_ready(game, output)?;
+                write!(output, "{}", render_turn_summary(game))
+            }
+            Err(error) => {
+                writeln!(output, "Error: {}", format_game_error(&error))
+            }
+        },
+        AiDecision::EndTurn => match game.end_turn() {
+            Ok(next) => {
+                *game = next;
+                writeln!(output, "Turn ended.")?;
+                write!(output, "{}", render_turn_summary(game))
+            }
+            Err(error) => {
+                writeln!(output, "Error: {}", format_game_error(&error))
+            }
+        },
+    }
+}
+
+fn ai_decision_command(decision: &AiDecision) -> String {
+    match decision {
+        AiDecision::EndTurn => "e".to_owned(),
+        AiDecision::Action(action) => ai_action_command(action),
+    }
+}
+
+fn ai_action_command(action: &Action) -> String {
+    match action {
+        Action::Build { system, ship, .. } => {
+            format!("b {} {}", system.index(), compact_piece(*ship))
+        }
+        Action::Travel {
+            from, ship, target, ..
+        } => match target {
+            TravelTarget::Existing(to) => {
+                format!(
+                    "t {} {} x {}",
+                    from.index(),
+                    compact_piece(*ship),
+                    to.index()
+                )
+            }
+            TravelTarget::New { stars } => format!(
+                "t {} {} n {}",
+                from.index(),
+                compact_piece(*ship),
+                stars
+                    .iter()
+                    .map(|star| compact_piece(*star))
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            ),
+        },
+        Action::Trade {
+            system, from, to, ..
+        } => format!(
+            "x {} {} {}",
+            system.index(),
+            compact_piece(*from),
+            compact_piece(*to)
+        ),
+        Action::Sacrifice { system, ship, .. } => {
+            format!("s {} {}", system.index(), compact_piece(*ship))
+        }
+        Action::Invade { system, target, .. } => {
+            format!("i {} {}", system.index(), compact_piece(*target))
+        }
+        Action::Catastrophe { system, color } => {
+            format!("c {} {}", system.index(), color_short(*color))
+        }
+    }
 }
 
 fn auto_end_turn_if_ready<W: Write>(game: &mut Game, output: &mut W) -> io::Result<()> {
@@ -843,6 +1078,7 @@ fn looks_like_yaml_save(input: &str) -> bool {
 fn run_history<W: Write>(
     history: &str,
     game: &mut Game,
+    ai_control: &mut AiControl,
     output: &mut W,
     load_depth: usize,
     typed_history: &[String],
@@ -853,7 +1089,9 @@ fn run_history<W: Write>(
             "{}> {command}",
             prompt_label(game.turn().current_player())
         )?;
-        if run_command(command, game, output, load_depth, typed_history)? == CommandOutcome::Quit {
+        if run_command(command, game, ai_control, output, load_depth, typed_history)?
+            == CommandOutcome::Quit
+        {
             return Ok(CommandOutcome::Quit);
         }
     }
@@ -864,14 +1102,23 @@ fn run_history<W: Write>(
 fn run_loaded_history<W: Write>(
     history: LoadedHistory,
     game: &mut Game,
+    ai_control: &mut AiControl,
     output: &mut W,
     load_depth: usize,
     typed_history: &[String],
 ) -> io::Result<CommandOutcome> {
-    match run_history(&history.commands, game, output, load_depth, typed_history)? {
+    match run_history(
+        &history.commands,
+        game,
+        ai_control,
+        output,
+        load_depth,
+        typed_history,
+    )? {
         CommandOutcome::Continue => {
             writeln!(output, "Finished commands from {}.", history.path.display())?;
             render_after_semicolon(history.show_after, game, output)?;
+            run_ai_turns(game, ai_control, output)?;
             Ok(CommandOutcome::Continue)
         }
         CommandOutcome::Quit => Ok(CommandOutcome::Quit),
@@ -1322,6 +1569,7 @@ mod tests {
     #[test]
     fn tab_completion_expands_unique_command_partials() {
         for (input, expected) in [
+            ("a", "ai"),
             ("bu", "build"),
             ("cat", "catastrophe"),
             ("en", "end"),
@@ -1410,6 +1658,18 @@ mod tests {
         assert_eq!(
             completion_candidates("c 0 r", 5, &snapshot),
             Some((4, vec!["red".to_owned()]))
+        );
+    }
+
+    #[test]
+    fn tab_completion_suggests_ai_arguments() {
+        assert_eq!(
+            completion_candidates("ai ", 3, &CompletionSnapshot::default()),
+            Some((3, vec!["show".to_owned(), "p1".to_owned(), "p2".to_owned()]))
+        );
+        assert_eq!(
+            completion_candidates("ai p2 p", 7, &CompletionSnapshot::default()),
+            Some((6, vec!["priority".to_owned()]))
         );
     }
 
@@ -1511,6 +1771,127 @@ q
         assert!(output.contains("Turn ended."));
         assert!(output.contains("Current player: Player 2"));
         assert!(output.contains("Remaining actions: 1"));
+        assert!(!output.contains("Error:"));
+    }
+
+    #[test]
+    fn ai_command_reports_selectable_strategies() {
+        let output = run_script(
+            "ys bm
+gs
+bl rl
+rm
+ai
+ai p2 first
+ai
+ai p2 off
+ai
+q
+",
+        );
+
+        assert!(output.contains("AI players: Player 1 human, Player 2 human"));
+        assert!(output.contains("AI Player 2 set to first."));
+        assert!(output.contains("AI players: Player 1 human, Player 2 first"));
+        assert!(output.contains("AI Player 2 disabled."));
+        assert!(!output.contains("Error:"));
+    }
+
+    #[test]
+    fn enabling_ai_for_current_player_runs_immediately() {
+        let output = run_script(
+            "ys bm
+gs
+bl rl
+rm
+ai p1 priority
+q
+",
+        );
+
+        assert!(output.contains("AI Player 1 set to priority."));
+        assert!(output.contains("P1> b 0 rs"));
+        assert!(output.contains("Action applied."));
+        assert!(output.contains("Turn ended."));
+        assert!(output.contains("Current player: Player 2"));
+        assert!(!output.contains("Error:"));
+    }
+
+    #[test]
+    fn ai_runs_after_human_turn_reaches_ai_player() {
+        let output = run_script(
+            "ys bm
+gs
+bl rl
+rm
+ai p2 priority
+b 0 rs
+q
+",
+        );
+
+        assert!(output.contains("AI Player 2 set to priority."));
+        assert!(output.contains("P2> x 1 rm ym"));
+        assert!(output.contains("Action applied."));
+        assert!(output.contains("Turn ended."));
+        assert!(output.contains("Current player: Player 1"));
+        assert!(!output.contains("Error:"));
+    }
+
+    #[test]
+    fn disabling_ai_stops_automatic_play() {
+        let output = run_script(
+            "ys bm
+gs
+bl rl
+rm
+ai p2 priority
+ai p2 off
+b 0 rs
+q
+",
+        );
+
+        assert!(output.contains("AI Player 2 set to priority."));
+        assert!(output.contains("AI Player 2 disabled."));
+        assert!(!output.contains("P2> x "));
+        assert!(output.contains("Current player: Player 2"));
+        assert!(!output.contains("Error:"));
+    }
+
+    #[test]
+    fn ai_configuration_survives_load_but_is_not_saved() {
+        let save_path = temp_save_path("ai_configuration_survives_load_but_is_not_saved");
+        let loaded_path = temp_save_path("ai_configuration_loaded_game");
+        fs::write(
+            &loaded_path,
+            save::to_yaml(&Game::default(Player::Two)).expect("game serializes"),
+        )
+        .expect("loaded game fixture writes");
+        let script = format!(
+            "ys bm
+gs
+bl rl
+rm
+ai p2 priority
+v {}
+l {}
+q
+",
+            save_path.display(),
+            loaded_path.display()
+        );
+
+        let output = run_script(&script);
+        let yaml = fs::read_to_string(&save_path).expect("save file exists");
+        let _ = fs::remove_file(save_path);
+        let _ = fs::remove_file(loaded_path);
+
+        assert!(output.contains("Loaded from "));
+        assert!(output.contains("P2> x 1 rm ym"));
+        assert!(!yaml.contains("priority"));
+        assert!(!yaml.contains("first"));
+        assert!(!yaml.contains("ai:"));
         assert!(!output.contains("Error:"));
     }
 

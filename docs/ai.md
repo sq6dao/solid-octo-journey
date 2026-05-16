@@ -57,3 +57,21 @@ action is treated as an immediate win when applying it, then legally
 ending the turn if possible, produces `GameOutcome::Winner` for the
 current player. `EndTurn` is treated as an immediate win when ending the
 turn directly produces that outcome.
+
+## CLI Integration
+
+`hw-cli` can assign either baseline strategy to a player during a
+session:
+
+```text
+ai p2 priority
+ai p1 first
+ai p2 off
+ai
+```
+
+AI control is session-local CLI state and is not written to YAML saves.
+After any command that reaches an AI-controlled turn, the CLI repeatedly
+asks the selected strategy for decisions until the turn returns to a
+human player or the game ends. AI decisions are printed with replay-style
+short commands such as `b 0 rs`, `x 1 rm ym`, or `e`.

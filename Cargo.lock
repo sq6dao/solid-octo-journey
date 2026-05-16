@@ -59,6 +59,7 @@ dependencies = [
 name = "hw-cli"
 version = "0.1.0"
 dependencies = [
+ "hw-ai",
  "hw-core",
  "hw-engine",
  "rustyline",

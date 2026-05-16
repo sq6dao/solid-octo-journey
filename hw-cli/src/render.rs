@@ -70,6 +70,8 @@ pub const fn render_help() -> &'static str {
   help | h
   end | e
   quit | q
+  ai [show]
+  ai p1 | p2 first | priority | off
   save | v <path>
   save-history | sh <path>
   load | l <path>  (YAML save or command history)
@@ -328,6 +330,7 @@ mod tests {
         let help = render_help();
 
         assert!(help.contains("show | s"));
+        assert!(help.contains("ai [show]"));
         assert!(help.contains("save-history | sh"));
         assert!(help.contains("build | b"));
         assert!(help.contains("trade | tr | x"));

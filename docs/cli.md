@@ -113,6 +113,9 @@ Use those IDs in action commands.
 | Show state | `s` | `show` |
 | End turn | `e` | `end` |
 | Quit | `q` | `quit` |
+| AI status |  | `ai` or `ai show` |
+| Enable AI |  | `ai p1 first`, `ai p1 priority`, `ai p2 first`, or `ai p2 priority` |
+| Disable AI |  | `ai p1 off` or `ai p2 off` |
 | Save | `v` | `save <path>` |
 | Save with history | `sh` | `save-history <path>` |
 | Load | `l` | `load <path>` |
@@ -161,6 +164,25 @@ When a paid action spends the last action and no catastrophe is possible,
 the CLI ends the turn automatically. If a catastrophe is possible, the
 turn stays with the current player at 0 actions so they can either run a
 `catastrophe` command or explicitly `end`.
+
+## Human Vs AI
+
+Use `ai p1 first`, `ai p1 priority`, `ai p2 first`, or
+`ai p2 priority` after setup to assign an AI strategy to a player. Use
+`ai p1 off` or `ai p2 off` to return that player to human control. Use
+`ai` or `ai show` to print the current AI control state.
+
+When the current player is AI-controlled, the CLI immediately applies AI
+decisions until the game ends or control returns to a human player. AI
+decisions are printed in the same short command style used by history
+replay, such as:
+
+```text
+P2> x 1 rm ym
+```
+
+AI control is session-only. It survives `load` commands in the current
+CLI session, but it is not stored in YAML save files.
 
 ## Semicolon Shortcut
 

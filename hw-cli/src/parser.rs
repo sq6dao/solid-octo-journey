@@ -8,10 +8,29 @@ pub enum ParsedCommand {
     Show,
     End,
     Quit,
+    Ai(AiCommand),
     Save(PathBuf),
     SaveHistory(PathBuf),
     Load(PathBuf),
     Action(Action),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AiCommand {
+    Show,
+    Set {
+        player: Player,
+        strategy: AiStrategy,
+    },
+    Off {
+        player: Player,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AiStrategy {
+    First,
+    Priority,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -79,6 +98,7 @@ pub fn parse_command(line: &str, current_player: Player) -> Result<ParsedCommand
         "s" if tokens.len() == 1 => Ok(ParsedCommand::Show),
         "end" | "e" => require_no_args(&tokens, ParsedCommand::End),
         "quit" | "q" => require_no_args(&tokens, ParsedCommand::Quit),
+        "ai" => parse_ai(&tokens),
         "build" | "b" => parse_build(&tokens, current_player),
         "travel" | "t" => parse_travel(&tokens, current_player),
         "trade" | "tr" | "x" => parse_trade(&tokens, current_player),
@@ -86,6 +106,39 @@ pub fn parse_command(line: &str, current_player: Player) -> Result<ParsedCommand
         "invade" | "i" => parse_invade(&tokens, current_player),
         "catastrophe" | "c" => parse_catastrophe(&tokens),
         other => Err(ParseError::new(format!("unknown command `{other}`"))),
+    }
+}
+
+fn parse_ai(tokens: &[String]) -> Result<ParsedCommand, ParseError> {
+    match tokens {
+        [_] => Ok(ParsedCommand::Ai(AiCommand::Show)),
+        [_, command] if command == "show" => Ok(ParsedCommand::Ai(AiCommand::Show)),
+        [_, _] => Err(ParseError::new("expected `show`, `off`, or AI strategy")),
+        [_, player, command] if command == "off" => Ok(ParsedCommand::Ai(AiCommand::Off {
+            player: parse_ai_player(player)?,
+        })),
+        [_, player, strategy] => Ok(ParsedCommand::Ai(AiCommand::Set {
+            player: parse_ai_player(player)?,
+            strategy: parse_ai_strategy(strategy)?,
+        })),
+        [_, _, _, ..] => Err(ParseError::new("unexpected extra input")),
+        [] => Err(ParseError::new("expected a command")),
+    }
+}
+
+fn parse_ai_player(token: &str) -> Result<Player, ParseError> {
+    match token {
+        "p1" | "1" | "player1" | "player-1" => Ok(Player::One),
+        "p2" | "2" | "player2" | "player-2" => Ok(Player::Two),
+        _ => Err(ParseError::new(format!("invalid AI player `{token}`"))),
+    }
+}
+
+fn parse_ai_strategy(token: &str) -> Result<AiStrategy, ParseError> {
+    match token {
+        "first" => Ok(AiStrategy::First),
+        "priority" => Ok(AiStrategy::Priority),
+        _ => Err(ParseError::new(format!("invalid AI strategy `{token}`"))),
     }
 }
 
@@ -402,6 +455,38 @@ mod tests {
     }
 
     #[test]
+    fn parses_ai_commands() {
+        assert_eq!(
+            parse_command("ai", Player::One),
+            Ok(ParsedCommand::Ai(AiCommand::Show))
+        );
+        assert_eq!(
+            parse_command("ai show", Player::One),
+            Ok(ParsedCommand::Ai(AiCommand::Show))
+        );
+        assert_eq!(
+            parse_command("ai p1 first", Player::One),
+            Ok(ParsedCommand::Ai(AiCommand::Set {
+                player: Player::One,
+                strategy: AiStrategy::First,
+            }))
+        );
+        assert_eq!(
+            parse_command("ai p2 priority", Player::One),
+            Ok(ParsedCommand::Ai(AiCommand::Set {
+                player: Player::Two,
+                strategy: AiStrategy::Priority,
+            }))
+        );
+        assert_eq!(
+            parse_command("ai p2 off", Player::One),
+            Ok(ParsedCommand::Ai(AiCommand::Off {
+                player: Player::Two,
+            }))
+        );
+    }
+
+    #[test]
     fn parses_trailing_semicolon_as_show_shortcut() {
         assert_eq!(
             parse_input("b 0 gs;", Player::One),
@@ -597,6 +682,9 @@ mod tests {
         assert!(parse_command("b 0", Player::One).is_err());
         assert!(parse_command("t 0 ys maybe 1", Player::One).is_err());
         assert!(parse_command("catastrophe 0 purple", Player::One).is_err());
+        assert!(parse_command("ai p3 priority", Player::One).is_err());
+        assert!(parse_command("ai p1 random", Player::One).is_err());
+        assert!(parse_command("ai p1 priority extra", Player::One).is_err());
         assert!(parse_command("save", Player::One).is_err());
         assert!(parse_command("save-history", Player::One).is_err());
         assert!(parse_command("load game.yaml extra", Player::One).is_err());

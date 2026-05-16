@@ -264,11 +264,11 @@ Initial action coverage:
 
 #### AI-5: UI Integration
 
-- [ ] Add human-vs-AI support to the CLI
-- [ ] Let the CLI repeatedly apply AI decisions until the AI turn ends
-- [ ] Print AI decisions in the same notation as replayed commands where
+- [x] Add human-vs-AI support to the CLI
+- [x] Let the CLI repeatedly apply AI decisions until the AI turn ends
+- [x] Print AI decisions in the same notation as replayed commands where
   practical
-- [ ] Reuse the same `hw-ai` APIs from the future TUI
+- [x] Reuse the same `hw-ai` APIs from the future TUI
 
 #### AI-6: Stronger AI
 
