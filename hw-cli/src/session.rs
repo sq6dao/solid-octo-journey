@@ -583,8 +583,13 @@ where
     loop {
         let prompt = format!("{}> ", prompt_label(game.turn().current_player()));
         input.set_completion_snapshot(CompletionSnapshot::from_game(&game));
-        let Some(line) = read_prompted_line(input, &prompt, &mut output)? else {
-            break;
+        let line = match read_prompted_line(input, &prompt, &mut output)? {
+            PromptLine::Read(line) => line,
+            PromptLine::Eof => break,
+            PromptLine::Interrupted => {
+                write_quit_message(&mut output)?;
+                break;
+            }
         };
 
         let command = line.trim();
@@ -884,22 +889,16 @@ fn render_after_semicolon<W: Write>(
     Ok(())
 }
 
-fn read_prompted_line<I, W>(
-    input: &mut I,
-    prompt: &str,
-    output: &mut W,
-) -> io::Result<Option<String>>
+fn read_prompted_line<I, W>(input: &mut I, prompt: &str, output: &mut W) -> io::Result<PromptLine>
 where
     I: LineInput,
     W: Write,
 {
-    loop {
-        match input.read_prompted_line(prompt, output)? {
-            PromptLine::Read(line) => return Ok(Some(line)),
-            PromptLine::Eof => return Ok(None),
-            PromptLine::Interrupted => continue,
-        }
-    }
+    input.read_prompted_line(prompt, output)
+}
+
+fn write_quit_message<W: Write>(output: &mut W) -> io::Result<()> {
+    writeln!(output, "Goodbye.")
 }
 
 fn prompt_game<I, W>(
@@ -966,8 +965,13 @@ where
     loop {
         writeln!(output, "{} setup", player_label(player))?;
         let prompt = format!("{} stars> ", player_label(player));
-        let Some(stars) = read_prompted_line(input, &prompt, output)? else {
-            return Ok(SetupPrompt::Eof);
+        let stars = match read_prompted_line(input, &prompt, output)? {
+            PromptLine::Read(line) => line,
+            PromptLine::Eof => return Ok(SetupPrompt::Eof),
+            PromptLine::Interrupted => {
+                write_quit_message(output)?;
+                return Ok(SetupPrompt::Eof);
+            }
         };
         let stars_line = stars.trim();
         record_user_history(input, typed_history, stars_line)?;
@@ -986,8 +990,13 @@ where
         }
 
         let prompt = format!("{} ship> ", player_label(player));
-        let Some(ship) = read_prompted_line(input, &prompt, output)? else {
-            return Ok(SetupPrompt::Eof);
+        let ship = match read_prompted_line(input, &prompt, output)? {
+            PromptLine::Read(line) => line,
+            PromptLine::Eof => return Ok(SetupPrompt::Eof),
+            PromptLine::Interrupted => {
+                write_quit_message(output)?;
+                return Ok(SetupPrompt::Eof);
+            }
         };
         let ship_line = ship.trim();
         record_user_history(input, typed_history, ship_line)?;
@@ -1165,15 +1174,23 @@ mod tests {
 
     #[derive(Default)]
     struct RecordingLineInput {
-        lines: VecDeque<String>,
+        lines: VecDeque<PromptLine>,
         prompts: Vec<String>,
         history_entries: Vec<String>,
     }
 
     impl RecordingLineInput {
         fn new(lines: impl IntoIterator<Item = &'static str>) -> Self {
+            Self::with_lines(
+                lines
+                    .into_iter()
+                    .map(|line| PromptLine::Read(line.to_owned())),
+            )
+        }
+
+        fn with_lines(lines: impl IntoIterator<Item = PromptLine>) -> Self {
             Self {
-                lines: lines.into_iter().map(str::to_owned).collect(),
+                lines: lines.into_iter().collect(),
                 prompts: Vec::new(),
                 history_entries: Vec::new(),
             }
@@ -1187,10 +1204,7 @@ mod tests {
             _output: &mut W,
         ) -> io::Result<PromptLine> {
             self.prompts.push(prompt.to_owned());
-            Ok(self
-                .lines
-                .pop_front()
-                .map_or(PromptLine::Eof, PromptLine::Read))
+            Ok(self.lines.pop_front().unwrap_or(PromptLine::Eof))
         }
 
         fn add_history_entry(&mut self, line: &str) -> io::Result<()> {
@@ -1221,6 +1235,49 @@ mod tests {
             input.history_entries,
             ["ys bm", "gs", "bl rl", "rm", "show", "q"]
         );
+    }
+
+    #[test]
+    fn ctrl_c_quits_during_setup() {
+        let mut input = RecordingLineInput::with_lines([PromptLine::Interrupted]);
+        let mut output = Vec::new();
+
+        run_with_line_input(&mut input, &mut output).expect("session exits cleanly");
+
+        let output = String::from_utf8(output).expect("output is utf8");
+        assert_eq!(input.prompts, ["Player 1 stars> "]);
+        assert!(input.history_entries.is_empty());
+        assert!(output.contains("Goodbye."));
+        assert!(!output.contains("Game started."));
+    }
+
+    #[test]
+    fn ctrl_c_quits_during_command_prompt() {
+        let mut input = RecordingLineInput::with_lines([
+            PromptLine::Read("ys bm".to_owned()),
+            PromptLine::Read("gs".to_owned()),
+            PromptLine::Read("bl rl".to_owned()),
+            PromptLine::Read("rm".to_owned()),
+            PromptLine::Interrupted,
+        ]);
+        let mut output = Vec::new();
+
+        run_with_line_input(&mut input, &mut output).expect("session exits cleanly");
+
+        let output = String::from_utf8(output).expect("output is utf8");
+        assert_eq!(
+            input.prompts,
+            [
+                "Player 1 stars> ",
+                "Player 1 ship> ",
+                "Player 2 stars> ",
+                "Player 2 ship> ",
+                "P1> ",
+            ]
+        );
+        assert_eq!(input.history_entries, ["ys bm", "gs", "bl rl", "rm"]);
+        assert!(output.contains("Game started."));
+        assert!(output.contains("Goodbye."));
     }
 
     #[test]
