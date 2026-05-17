@@ -16,7 +16,9 @@ pub struct FirstLegalStrategy;
 
 impl Strategy for FirstLegalStrategy {
     fn choose(&self, game: &Game) -> Option<AiDecision> {
-        legal_decisions(game).into_iter().next()
+        legal_decisions(game)
+            .into_iter()
+            .find(|decision| !is_immediate_non_win(game, decision))
     }
 }
 
@@ -25,7 +27,10 @@ pub struct PriorityStrategy;
 
 impl Strategy for PriorityStrategy {
     fn choose(&self, game: &Game) -> Option<AiDecision> {
-        let decisions = legal_decisions(game);
+        let decisions = legal_decisions(game)
+            .into_iter()
+            .filter(|decision| !is_immediate_non_win(game, decision))
+            .collect::<Vec<_>>();
 
         first_matching(&decisions, |decision| is_immediate_win(game, decision))
             .or_else(|| first_matching(&decisions, is_catastrophe_decision))
@@ -293,8 +298,32 @@ fn is_immediate_win(game: &Game, decision: &AiDecision) -> bool {
     }
 }
 
+fn is_immediate_non_win(game: &Game, decision: &AiDecision) -> bool {
+    let current_player = game.turn().current_player();
+
+    match decision {
+        AiDecision::Action(action) => game.apply_action(action).is_ok_and(|next| {
+            is_terminal_non_win(next.status(), current_player)
+                || next
+                    .end_turn()
+                    .is_ok_and(|ended| is_terminal_non_win(ended.status(), current_player))
+        }),
+        AiDecision::EndTurn => game
+            .end_turn()
+            .is_ok_and(|next| is_terminal_non_win(next.status(), current_player)),
+    }
+}
+
 fn is_winning_status(status: GameStatus, player: hw_core::Player) -> bool {
     matches!(status, GameStatus::Finished(GameOutcome::Winner(winner)) if winner == player)
+}
+
+fn is_terminal_non_win(status: GameStatus, player: hw_core::Player) -> bool {
+    match status {
+        GameStatus::InProgress => false,
+        GameStatus::Finished(GameOutcome::Winner(winner)) => winner != player,
+        GameStatus::Finished(GameOutcome::Draw) => true,
+    }
 }
 
 fn is_catastrophe_decision(decision: &AiDecision) -> bool {
@@ -346,6 +375,46 @@ mod tests {
     }
 
     #[test]
+    fn first_legal_strategy_skips_immediate_loss() {
+        let game = last_homeworld_ship_travel_game();
+
+        assert_eq!(
+            legal_decisions(&game).into_iter().next(),
+            Some(AiDecision::Action(Action::Travel {
+                player: Player::One,
+                from: SystemId::new(0),
+                ship: Piece::owned(Color::Yellow, Size::Small, Player::One),
+                target: TravelTarget::Existing(SystemId::new(1)),
+            }))
+        );
+        assert_eq!(
+            FirstLegalStrategy.choose(&game),
+            Some(AiDecision::Action(Action::Catastrophe {
+                system: SystemId::new(1),
+                color: Color::Red,
+            }))
+        );
+    }
+
+    #[test]
+    fn strategies_return_none_when_all_decisions_immediately_lose() {
+        let game = empty_current_homeworld_game();
+
+        assert_eq!(legal_decisions(&game), vec![AiDecision::EndTurn]);
+        assert_eq!(FirstLegalStrategy.choose(&game), None);
+        assert_eq!(PriorityStrategy.choose(&game), None);
+    }
+
+    #[test]
+    fn strategies_return_none_when_all_decisions_immediately_draw() {
+        let game = empty_homeworlds_game();
+
+        assert_eq!(legal_decisions(&game), vec![AiDecision::EndTurn]);
+        assert_eq!(FirstLegalStrategy.choose(&game), None);
+        assert_eq!(PriorityStrategy.choose(&game), None);
+    }
+
+    #[test]
     fn priority_strategy_prefers_immediate_wins() {
         let game = winning_catastrophe_game();
 
@@ -369,6 +438,13 @@ mod tests {
                 color: Color::Red,
             }))
         );
+    }
+
+    #[test]
+    fn priority_strategy_skips_immediate_loss() {
+        let game = losing_catastrophe_or_safe_end_turn_game();
+
+        assert_eq!(PriorityStrategy.choose(&game), Some(AiDecision::EndTurn));
     }
 
     #[test]
@@ -694,6 +770,110 @@ mod tests {
             Player::One,
         )
         .expect("game initializes")
+    }
+
+    fn last_homeworld_ship_travel_game() -> Game {
+        use hw_core::{Bank, GameState, StarSystem};
+
+        let state = GameState::new(
+            vec![
+                StarSystem::new(
+                    vec![Piece::new(Color::Yellow, Size::Small)],
+                    vec![Piece::owned(Color::Yellow, Size::Small, Player::One)],
+                )
+                .expect("system is valid"),
+                StarSystem::new(
+                    vec![
+                        Piece::new(Color::Red, Size::Large),
+                        Piece::new(Color::Blue, Size::Medium),
+                    ],
+                    vec![
+                        Piece::owned(Color::Red, Size::Small, Player::Two),
+                        Piece::owned(Color::Red, Size::Medium, Player::Two),
+                        Piece::owned(Color::Red, Size::Large, Player::Two),
+                    ],
+                )
+                .expect("system is valid"),
+            ],
+            [SystemId::new(0), SystemId::new(1)],
+            Bank::new(),
+        )
+        .expect("state is valid");
+
+        Game::from_parts(TurnState::new(state, Player::One), GameStatus::InProgress)
+    }
+
+    fn empty_current_homeworld_game() -> Game {
+        use hw_core::{Bank, GameState, StarSystem};
+
+        let state = GameState::new(
+            vec![
+                StarSystem::new(vec![Piece::new(Color::Yellow, Size::Small)], vec![])
+                    .expect("system is valid"),
+                StarSystem::new(
+                    vec![Piece::new(Color::Blue, Size::Medium)],
+                    vec![Piece::owned(Color::Blue, Size::Small, Player::Two)],
+                )
+                .expect("system is valid"),
+            ],
+            [SystemId::new(0), SystemId::new(1)],
+            Bank::new(),
+        )
+        .expect("state is valid");
+        let turn = TurnState::from_parts(state, Player::One, 0, None);
+
+        Game::from_parts(turn, GameStatus::InProgress)
+    }
+
+    fn empty_homeworlds_game() -> Game {
+        use hw_core::{Bank, GameState, StarSystem};
+
+        let state = GameState::new(
+            vec![
+                StarSystem::new(vec![Piece::new(Color::Yellow, Size::Small)], vec![])
+                    .expect("system is valid"),
+                StarSystem::new(vec![Piece::new(Color::Blue, Size::Medium)], vec![])
+                    .expect("system is valid"),
+            ],
+            [SystemId::new(0), SystemId::new(1)],
+            Bank::new(),
+        )
+        .expect("state is valid");
+        let turn = TurnState::from_parts(state, Player::One, 0, None);
+
+        Game::from_parts(turn, GameStatus::InProgress)
+    }
+
+    fn losing_catastrophe_or_safe_end_turn_game() -> Game {
+        use hw_core::{Bank, GameState, StarSystem};
+
+        let state = GameState::new(
+            vec![
+                StarSystem::new(
+                    vec![
+                        Piece::new(Color::Red, Size::Small),
+                        Piece::new(Color::Yellow, Size::Medium),
+                    ],
+                    vec![
+                        Piece::owned(Color::Red, Size::Small, Player::One),
+                        Piece::owned(Color::Red, Size::Medium, Player::One),
+                        Piece::owned(Color::Red, Size::Large, Player::One),
+                    ],
+                )
+                .expect("system is valid"),
+                StarSystem::new(
+                    vec![Piece::new(Color::Blue, Size::Large)],
+                    vec![Piece::owned(Color::Blue, Size::Small, Player::Two)],
+                )
+                .expect("system is valid"),
+            ],
+            [SystemId::new(0), SystemId::new(1)],
+            Bank::new(),
+        )
+        .expect("state is valid");
+        let turn = TurnState::from_parts(state, Player::One, 0, None);
+
+        Game::from_parts(turn, GameStatus::InProgress)
     }
 
     fn invade_game() -> Game {

@@ -41,8 +41,9 @@ let decision = FirstLegalStrategy.choose(&game);
 let stronger_decision = PriorityStrategy.choose(&game);
 ```
 
-`FirstLegalStrategy` returns the first generated legal decision, or
-`None` for terminal games and other positions with no legal decisions.
+`FirstLegalStrategy` returns the first generated legal decision that does
+not immediately produce a terminal non-win for the current player, or
+`None` for terminal games and positions with no safe legal decisions.
 
 `PriorityStrategy` is still deterministic, but it groups legal decisions
 before choosing. It prefers:
@@ -57,6 +58,10 @@ action is treated as an immediate win when applying it, then legally
 ending the turn if possible, produces `GameOutcome::Winner` for the
 current player. `EndTurn` is treated as an immediate win when ending the
 turn directly produces that outcome.
+
+Both strategies skip decisions that would immediately produce a
+`GameOutcome::Winner` for the opponent or `GameOutcome::Draw`, either
+directly or after legally ending the turn from the resulting position.
 
 ## CLI Integration
 

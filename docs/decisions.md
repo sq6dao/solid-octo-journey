@@ -796,10 +796,12 @@ Planned public concepts are:
 
 V1 AI is deterministic and uses no randomness. Legal decision generation
 comes before evaluation or search. Baseline strategies choose one legal
-decision at a time: `FirstLegalStrategy` returns the first generated
-decision, while `PriorityStrategy` prefers immediate current-player wins,
-then legal catastrophes, then paid actions, then legal turn end. CLI and
-TUI integration should wait until reusable AI APIs exist.
+decision at a time from decisions that do not immediately produce a
+terminal non-win for the current player. `FirstLegalStrategy` returns the
+first safe generated decision, while `PriorityStrategy` prefers immediate
+current-player wins, then legal catastrophes, then paid actions, then
+legal turn end. CLI and TUI integration should wait until reusable AI APIs
+exist.
 
 Legal generation must preserve current game rules:
 
