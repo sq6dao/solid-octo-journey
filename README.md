@@ -8,6 +8,7 @@ A modular Rust engine for a two-player Homeworlds-style game.
 - `hw-engine`: actions, validation, transitions, turns, and game flow.
 - `hw-cli`: simple text hot-seat interface.
 - `hw-ai`: deterministic reusable AI decision support.
+- `hw-tui`: Ratatui-based terminal interface.
 
 ## Current Features
 
@@ -18,6 +19,8 @@ A modular Rust engine for a two-player Homeworlds-style game.
 - Hand-editable YAML save/load support.
 - Text hot-seat CLI with short commands, command replay files, session
   history saves, human-vs-AI play, and interactive arrow-key editing.
+- Ratatui TUI with setup prompts, board/status panels, command input,
+  save/load, and AI strategy control.
 
 ## Run Tests
 
@@ -100,3 +103,15 @@ The same `load` command can also replay a plain text command history file
 with one CLI command per line. History files ignore empty lines and `#`
 comments. See [docs/cli.md](docs/cli.md) for the full command reference
 and [docs/save-format.md](docs/save-format.md) for the save format.
+
+## Run The TUI
+
+From the repository root:
+
+```sh
+cargo run -p hw-tui
+```
+
+The TUI uses the same setup lines and command syntax as the CLI. It also
+accepts `load <path>` during setup for YAML saves or command history
+files. See [docs/tui.md](docs/tui.md) for details.

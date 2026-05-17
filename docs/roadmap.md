@@ -42,6 +42,9 @@
   command parsing, state rendering, turn feedback, and the semicolon
   state-display shortcut. Game startup requires exactly two stars in
   each homeworld. See `docs/cli.md` for command details.
+- `hw-tui` provides a Ratatui-based playable terminal UI with setup
+  prompts, command input, board/status panels, help, save/load, and AI
+  strategy control.
 - The workspace test suite currently covers core piece, bank, and star
   system invariants, `GameState` container behavior, and initial action
   validation.
@@ -284,12 +287,12 @@ Initial action coverage:
 ### Goal
 Richer playable terminal UI, probably with Ratatui.
 
-- [ ] Add Ratatui-based application shell
-- [ ] Render board and system state panels
-- [ ] Add command/input panel
-- [ ] Show turn, action budget, errors, and game outcome feedback
-- [ ] Add help/reference view
-- [ ] Integrate save/load once serialization exists
+- [x] Add Ratatui-based application shell
+- [x] Render board and system state panels
+- [x] Add command/input panel
+- [x] Show turn, action budget, errors, and game outcome feedback
+- [x] Add help/reference view
+- [x] Integrate save/load once serialization exists
 
 ---
 

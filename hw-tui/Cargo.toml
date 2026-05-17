@@ -1,0 +1,12 @@
+[package]
+name = "hw-tui"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+crossterm = "0.29"
+hw-ai = { path = "../hw-ai" }
+hw-cli = { path = "../hw-cli" }
+hw-core = { path = "../hw-core" }
+hw-engine = { path = "../hw-engine" }
+ratatui = { version = "0.30", default-features = false, features = ["all-widgets", "crossterm_0_29"] }

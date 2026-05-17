@@ -5,6 +5,7 @@ members = [
     "hw-engine",
     "hw-cli",
     "hw-ai",
+    "hw-tui",
 ]
 
 [workspace.package]
