@@ -1,3 +1,9 @@
+mod evaluation;
+mod search;
+
+pub use evaluation::{Evaluation, evaluate_position};
+pub use search::{ScoredDecision, SearchStrategy, best_decision, best_decision_at_depth};
+
 use hw_core::{Color, Piece, Size, SystemId};
 use hw_engine::{Action, ActionKind, Game, GameOutcome, GameStatus, TravelTarget};
 
@@ -298,7 +304,7 @@ fn is_immediate_win(game: &Game, decision: &AiDecision) -> bool {
     }
 }
 
-fn is_immediate_non_win(game: &Game, decision: &AiDecision) -> bool {
+pub(crate) fn is_immediate_non_win(game: &Game, decision: &AiDecision) -> bool {
     let current_player = game.turn().current_player();
 
     match decision {

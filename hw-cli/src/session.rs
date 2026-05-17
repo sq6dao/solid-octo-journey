@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use hw_ai::{AiDecision, FirstLegalStrategy, PriorityStrategy, Strategy};
+use hw_ai::{AiDecision, FirstLegalStrategy, PriorityStrategy, SearchStrategy, Strategy};
 use hw_core::{Color, Piece, Player, Size};
 use hw_engine::{
     Action, Game, GameStatus, HomeworldSetup, TravelTarget, has_possible_catastrophe, save,
@@ -59,7 +59,7 @@ const COMMAND_ALIASES: &[(&str, &str)] = &[
 const TRAVEL_TARGET_WORDS: &[&str] = &["existing", "new", "x", "n"];
 const COLOR_WORDS: &[&str] = &["red", "yellow", "green", "blue", "r", "y", "g", "b"];
 const AI_TARGET_WORDS: &[&str] = &["show", "p1", "p2"];
-const AI_MODE_WORDS: &[&str] = &["first", "priority", "off"];
+const AI_MODE_WORDS: &[&str] = &["first", "priority", "search", "off"];
 const MAX_AI_DECISIONS: usize = 512;
 
 struct PromptedGame {
@@ -893,6 +893,7 @@ fn ai_strategy_label(strategy: AiStrategy) -> &'static str {
     match strategy {
         AiStrategy::First => "first",
         AiStrategy::Priority => "priority",
+        AiStrategy::Search => "search",
     }
 }
 
@@ -931,6 +932,7 @@ fn choose_ai_decision(strategy: AiStrategy, game: &Game) -> Option<AiDecision> {
     match strategy {
         AiStrategy::First => FirstLegalStrategy.choose(game),
         AiStrategy::Priority => PriorityStrategy.choose(game),
+        AiStrategy::Search => SearchStrategy::default().choose(game),
     }
 }
 
@@ -1671,6 +1673,10 @@ mod tests {
             completion_candidates("ai p2 p", 7, &CompletionSnapshot::default()),
             Some((6, vec!["priority".to_owned()]))
         );
+        assert_eq!(
+            completion_candidates("ai p2 s", 7, &CompletionSnapshot::default()),
+            Some((6, vec!["search".to_owned()]))
+        );
     }
 
     #[test]
@@ -1794,6 +1800,24 @@ q
         assert!(output.contains("AI Player 2 set to first."));
         assert!(output.contains("AI players: Player 1 human, Player 2 first"));
         assert!(output.contains("AI Player 2 disabled."));
+        assert!(!output.contains("Error:"));
+    }
+
+    #[test]
+    fn ai_command_accepts_search_strategy() {
+        let output = run_script(
+            "ys bm
+gs
+bl rl
+rm
+ai p2 search
+ai
+q
+",
+        );
+
+        assert!(output.contains("AI Player 2 set to search."));
+        assert!(output.contains("AI players: Player 1 human, Player 2 search"));
         assert!(!output.contains("Error:"));
     }
 

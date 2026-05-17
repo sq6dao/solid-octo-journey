@@ -246,21 +246,21 @@ Initial action coverage:
 
 #### AI-3: Heuristic Evaluation
 
-- [ ] Add a board-position evaluator
-- [ ] Score homeworld safety
-- [ ] Score ship count and ship size
-- [ ] Score color access and action flexibility
-- [ ] Score opponent pressure and invasion threats
-- [ ] Account for bank scarcity
-- [ ] Keep the evaluator deterministic and explainable in tests
+- [x] Add a board-position evaluator
+- [x] Score homeworld safety
+- [x] Score ship count and ship size
+- [x] Score color access and action flexibility
+- [x] Score opponent pressure and invasion threats
+- [x] Account for bank scarcity
+- [x] Keep the evaluator deterministic and explainable in tests
 
 #### AI-4: Shallow Search
 
-- [ ] Add one-ply move selection over `AiDecision`
-- [ ] Add configurable depth-limited search
-- [ ] Use deterministic tie-breaking for equal scores
-- [ ] Keep randomness out of v1 search
-- [ ] Test search on small tactical fixtures
+- [x] Add one-ply move selection over `AiDecision`
+- [x] Add configurable depth-limited search
+- [x] Use deterministic tie-breaking for equal scores
+- [x] Keep randomness out of v1 search
+- [x] Test search on small tactical fixtures
 
 #### AI-5: UI Integration
 

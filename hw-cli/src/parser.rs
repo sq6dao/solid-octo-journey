@@ -31,6 +31,7 @@ pub enum AiCommand {
 pub enum AiStrategy {
     First,
     Priority,
+    Search,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -138,6 +139,7 @@ fn parse_ai_strategy(token: &str) -> Result<AiStrategy, ParseError> {
     match token {
         "first" => Ok(AiStrategy::First),
         "priority" => Ok(AiStrategy::Priority),
+        "search" => Ok(AiStrategy::Search),
         _ => Err(ParseError::new(format!("invalid AI strategy `{token}`"))),
     }
 }
@@ -476,6 +478,13 @@ mod tests {
             Ok(ParsedCommand::Ai(AiCommand::Set {
                 player: Player::Two,
                 strategy: AiStrategy::Priority,
+            }))
+        );
+        assert_eq!(
+            parse_command("ai p1 search", Player::One),
+            Ok(ParsedCommand::Ai(AiCommand::Set {
+                player: Player::One,
+                strategy: AiStrategy::Search,
             }))
         );
         assert_eq!(

@@ -33,12 +33,13 @@ order.
 Strategy implementations use the same legal-decision stream:
 
 ```rust
-use hw_ai::{FirstLegalStrategy, PriorityStrategy, Strategy};
+use hw_ai::{FirstLegalStrategy, PriorityStrategy, SearchStrategy, Strategy};
 use hw_engine::Game;
 
 let game = Game::default(hw_core::Player::One);
 let decision = FirstLegalStrategy.choose(&game);
 let stronger_decision = PriorityStrategy.choose(&game);
+let search_decision = SearchStrategy::default().choose(&game);
 ```
 
 `FirstLegalStrategy` returns the first generated legal decision that does
@@ -63,13 +64,55 @@ Both strategies skip decisions that would immediately produce a
 `GameOutcome::Winner` for the opponent or `GameOutcome::Draw`, either
 directly or after legally ending the turn from the resulting position.
 
+## Heuristic Evaluation
+
+`hw-ai` also exposes a deterministic position evaluator for future search
+strategies:
+
+```rust
+use hw_ai::{Evaluation, evaluate_position};
+use hw_core::Player;
+use hw_engine::Game;
+
+let game = Game::default(Player::One);
+let evaluation: Evaluation = evaluate_position(&game, Player::One);
+```
+
+`Evaluation` reports a `total` score plus component scores for
+homeworld safety, material, color access, invasion pressure, and bank
+availability. Terminal wins receive a decisive positive score, terminal
+losses receive a decisive negative score, and terminal draws are scored
+below non-terminal safe positions. Non-terminal scores are simple integer
+heuristics so tests can assert both the total and the reason for the
+score.
+
+## Shallow Search
+
+Search APIs select legal decisions by applying candidates and scoring the
+resulting position:
+
+```rust
+use hw_ai::{SearchStrategy, best_decision, best_decision_at_depth};
+use hw_engine::Game;
+
+let game = Game::default(hw_core::Player::One);
+let one_ply = best_decision(&game);
+let deeper = best_decision_at_depth(&game, 2);
+let strategy = SearchStrategy::new(2);
+```
+
+Search skips immediately unsafe decisions in the same way as the
+baseline strategies. Depth counts individual `AiDecision` plies, equal
+scores keep legal-generation order, and no randomness is used.
+
 ## CLI Integration
 
-`hw-cli` can assign either baseline strategy to a player during a
+`hw-cli` can assign any supported strategy to a player during a
 session:
 
 ```text
 ai p2 priority
+ai p1 search
 ai p1 first
 ai p2 off
 ai

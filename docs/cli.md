@@ -114,7 +114,7 @@ Use those IDs in action commands.
 | End turn | `e` | `end` |
 | Quit | `q` | `quit` |
 | AI status |  | `ai` or `ai show` |
-| Enable AI |  | `ai p1 first`, `ai p1 priority`, `ai p2 first`, or `ai p2 priority` |
+| Enable AI |  | `ai p1 first`, `ai p1 priority`, `ai p1 search`, `ai p2 first`, `ai p2 priority`, or `ai p2 search` |
 | Disable AI |  | `ai p1 off` or `ai p2 off` |
 | Save | `v` | `save <path>` |
 | Save with history | `sh` | `save-history <path>` |
@@ -167,10 +167,11 @@ turn stays with the current player at 0 actions so they can either run a
 
 ## Human Vs AI
 
-Use `ai p1 first`, `ai p1 priority`, `ai p2 first`, or
-`ai p2 priority` after setup to assign an AI strategy to a player. Use
-`ai p1 off` or `ai p2 off` to return that player to human control. Use
-`ai` or `ai show` to print the current AI control state.
+Use `ai p1 first`, `ai p1 priority`, `ai p1 search`, `ai p2 first`,
+`ai p2 priority`, or `ai p2 search` after setup to assign an AI strategy
+to a player. Use `ai p1 off` or `ai p2 off` to return that player to
+human control. Use `ai` or `ai show` to print the current AI control
+state.
 
 When the current player is AI-controlled, the CLI immediately applies AI
 decisions until the game ends or control returns to a human player. AI
